@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Email Settings — Admin{% endblock %}
+
+{% block content %}
+<section class="form-page">
+    <div class="form-wrap">
+
+        <div style="margin-bottom:8px;">
+            <a href="{{ url_for('admin_panel') }}" class="back-link">← Back to Admin Panel</a>
+        </div>
+
+        <h1 class="page-title">Email Settings</h1>
+        <p class="page-sub">
+            Configure Gmail SMTP so the system can send real email notifications
+            when a student ID card is found. Uses your Gmail App Password.
+        </p>
+
+        <!-- How to get App Password instructions -->
+        <div class="info-box">
+            <p class="info-title">📋 How to set up Gmail</p>
+            <ol class="info-steps">
+                <li>Go to <strong>myaccount.google.com</strong> → Security</li>
+                <li>Enable <strong>2-Step Verification</strong> if not already on</li>
+                <li>Search for <strong>"App Passwords"</strong> in Google Account</li>
+                <li>Create a new App Password → select <strong>Mail</strong> → <strong>Other (custom name)</strong></li>
+                <li>Enter "Lost and Found" as the name → click Generate</li>
+                <li>Copy the 16-character password and paste it below</li>
+            </ol>
+        </div>
+
+        <div class="form-card">
+            <form method="POST" action="{{ url_for('admin_email_settings') }}">
+
+                <div class="field">
+                    <label for="sender">Gmail Address</label>
+                    <input type="email" id="sender" name="sender"
+                        value="{{ settings.sender }}"
+                        placeholder="yourname@gmail.com" required>
+                    <small>The Gmail account that will send notifications</small>
+                </div>
+
+                <div class="field">
+                    <label for="password">Gmail App Password</label>
+                    <input type="password" id="password" name="password"
+                        placeholder="{{ '••••••••••••••••  (leave blank to keep current)' if settings.password else '16-character App Password from Google' }}">
+                    <small>
+                        This is NOT your regular Gmail password. It's the App Password from Google Account → Security.
+                        Leave blank to keep the existing password.
+                    </small>
+                </div>
+
+                <div class="field">
+                    <label class="toggle-label">
+                        <input type="checkbox" name="enabled" id="enabled"
+                            {{ 'checked' if settings.enabled else '' }}>
+                        <span class="toggle-text">Enable email sending</span>
+                    </label>
+                    <small>When off, notifications are simulated (printed to console only)</small>
+                </div>
+
+                <!-- Current status -->
+                <div class="status-box {{ 'status-ok' if settings.enabled and settings.sender else 'status-off' }}">
+                    {% if settings.enabled and settings.sender %}
+                        ✅ Email is <strong>active</strong> — sending from <strong>{{ settings.sender }}</strong>
+                    {% else %}
+                        ⚠️ Email is <strong>off</strong> — notifications will be simulated only
+                    {% endif %}
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn-submit">Save & Test Connection</button>
+                    <a href="{{ url_for('admin_panel') }}" class="btn-cancel">Cancel</a>
+                </div>
+
+            </form>
+        </div>
+
+    </div>
+</section>
+{% endblock %}

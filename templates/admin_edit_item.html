@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Edit Item — Admin{% endblock %}
+
+{% block content %}
+<section class="form-page">
+    <div class="form-wrap">
+
+        <a href="{{ url_for('admin_panel') }}" class="back-link">← Back to Admin Panel</a>
+
+        <h1 class="page-title" style="margin-top:16px;">Edit Item</h1>
+        <p class="page-sub">Editing: <strong>{{ item.title }}</strong></p>
+
+        <div class="form-card">
+            <form method="POST">
+
+                <div class="field">
+                    <label for="title">Item Name <span class="req">*</span></label>
+                    <input type="text" id="title" name="title" value="{{ item.title }}" required>
+                </div>
+
+                <div class="field">
+                    <label for="category">Category <span class="req">*</span></label>
+                    <select id="category" name="category" required>
+                        {% for cat in ['ID Card','Electronics','Wallet','Keys','Bag','Books','Other'] %}
+                            <option value="{{ cat }}" {{ 'selected' if item.category == cat else '' }}>{{ cat }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="field">
+                    <label for="status">Status <span class="req">*</span></label>
+                    <select id="status" name="status" required>
+                        <option value="found"     {{ 'selected' if item.status == 'found'     else '' }}>Found</option>
+                        <option value="lost"      {{ 'selected' if item.status == 'lost'      else '' }}>Lost</option>
+                        <option value="recovered" {{ 'selected' if item.status == 'recovered' else '' }}>Recovered</option>
+                    </select>
+                </div>
+
+                <div class="field">
+                    <label for="location">Location <span class="req">*</span></label>
+                    <input type="text" id="location" name="location" value="{{ item.location }}" required>
+                </div>
+
+                <div class="field">
+                    <label for="date_found">Date</label>
+                    <input type="date" id="date_found" name="date_found" value="{{ item.get('date_found','') }}">
+                </div>
+
+                <div class="field">
+                    <label for="description">Description <span class="req">*</span></label>
+                    <textarea id="description" name="description" rows="4" required>{{ item.description }}</textarea>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn-submit">Save Changes</button>
+                    <a href="{{ url_for('admin_panel') }}" class="btn-cancel">Cancel</a>
+                </div>
+
+            </form>
+        </div>
+    </div>
+</section>
+{% endblock %}

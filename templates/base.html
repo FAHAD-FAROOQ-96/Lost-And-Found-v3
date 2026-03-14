@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Lost & Found — FAST NUCES{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+    <nav class="navbar">
+        <div class="nav-inner">
+            <a href="{{ url_for('home') }}" class="logo">
+                <span class="logo-dot"></span>
+                Lost &amp; Found
+            </a>
+            <div class="nav-links">
+                <a href="{{ url_for('home') }}"
+                   class="nav-link {% if request.endpoint == 'home' %}active{% endif %}">Home</a>
+                <a href="{{ url_for('submissions') }}"
+                   class="nav-link {% if request.endpoint == 'submissions' %}active{% endif %}">Submissions</a>
+                {% if current_user and current_user.get('is_admin') %}
+                    <a href="{{ url_for('admin_panel') }}"
+                       class="nav-link admin-link {% if 'admin' in request.endpoint %}active{% endif %}">⚙ Admin</a>
+                {% endif %}
+            </div>
+            <div class="nav-auth">
+                {% if current_user %}
+                    <span class="nav-user">{{ current_user.name }}</span>
+                    <a href="{{ url_for('logout') }}" class="btn-outline-sm">Log Out</a>
+                {% else %}
+                    <a href="{{ url_for('login') }}"  class="btn-outline-sm">Log In</a>
+                    <a href="{{ url_for('signup') }}" class="btn-accent-sm">Sign Up</a>
+                {% endif %}
+            </div>
+        </div>
+    </nav>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="flash-wrap">
+                {% for category, message in messages %}
+                    <div class="flash flash-{{ category }}">
+                        {{ message }}
+                        <button onclick="this.parentElement.remove()" class="flash-x">×</button>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    <main>{% block content %}{% endblock %}</main>
+
+    <footer class="footer">
+        <div class="footer-inner">
+            <span class="logo"><span class="logo-dot"></span>Lost &amp; Found</span>
+            <span class="footer-sub">FAST NUCES Islamabad — Campus Item Recovery System</span>
+        </div>
+    </footer>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>

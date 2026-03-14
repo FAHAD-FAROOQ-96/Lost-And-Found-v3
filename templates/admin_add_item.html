@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Add Item — Admin{% endblock %}
+
+{% block content %}
+<section class="form-page">
+    <div class="form-wrap">
+
+        <a href="{{ url_for('admin_panel') }}" class="back-link">← Back to Admin Panel</a>
+
+        <h1 class="page-title" style="margin-top:16px;">Add Item</h1>
+        <p class="page-sub">Manually add a lost or found item to the system.</p>
+
+        <div class="form-card">
+            <form method="POST">
+
+                <div class="field">
+                    <label>Status</label>
+                    <div class="radio-row">
+                        <label class="radio-opt">
+                            <input type="radio" name="status" value="found" checked>
+                            <span>✅ Found</span>
+                        </label>
+                        <label class="radio-opt">
+                            <input type="radio" name="status" value="lost">
+                            <span>❌ Lost</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="field">
+                    <label for="title">Item Name <span class="req">*</span></label>
+                    <input type="text" id="title" name="title" placeholder="e.g. Student ID Card" required>
+                </div>
+
+                <div class="field">
+                    <label for="category">Category <span class="req">*</span></label>
+                    <select id="category" name="category" required>
+                        <option value="">-- Select --</option>
+                        {% for cat in ['ID Card','Electronics','Wallet','Keys','Bag','Books','Other'] %}
+                            <option value="{{ cat }}">{{ cat }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="field">
+                    <label for="location">Location <span class="req">*</span></label>
+                    <input type="text" id="location" name="location" placeholder="e.g. Library, Lab 3" required>
+                </div>
+
+                <div class="field">
+                    <label for="date_found">Date</label>
+                    <input type="date" id="date_found" name="date_found">
+                </div>
+
+                <div class="field">
+                    <label for="description">Description <span class="req">*</span></label>
+                    <textarea id="description" name="description" rows="4"
+                        placeholder="Describe the item..." required></textarea>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn-submit">Add Item</button>
+                    <a href="{{ url_for('admin_panel') }}" class="btn-cancel">Cancel</a>
+                </div>
+
+            </form>
+        </div>
+    </div>
+</section>
+{% endblock %}

@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}Submissions — Lost & Found{% endblock %}
+
+{% block content %}
+<section class="list-page">
+    <div class="list-wrap">
+
+        <div class="list-header">
+            <div>
+                <h1 class="page-title">All Submissions</h1>
+                <p class="page-sub">{{ items|length }} item(s) reported on campus</p>
+            </div>
+            {% if current_user %}
+                <a href="{{ url_for('report') }}" class="btn-accent">+ Report an Item</a>
+            {% else %}
+                <a href="{{ url_for('login') }}" class="btn-accent">Log In to Report</a>
+            {% endif %}
+        </div>
+
+        {% if items %}
+            <div class="items-grid">
+                {% for item in items %}
+                    <div class="item-card">
+
+                        <div class="item-top">
+                            <span class="cat-tag">{{ item.category }}</span>
+                            <span class="status-tag status-{{ item.status }}">{{ item.status.upper() }}</span>
+                        </div>
+
+                        {% if item.image %}
+                            <img class="item-thumb"
+                                 src="{{ url_for('static', filename='uploads/' + item.image) }}"
+                                 alt="{{ item.title }}">
+                        {% else %}
+                            <div class="item-icon">
+                                {% if item.category == "Electronics" %}📱
+                                {% elif item.category == "ID Card" %}🪪
+                                {% elif item.category == "Wallet" %}👛
+                                {% elif item.category == "Keys" %}🔑
+                                {% elif item.category == "Bag" %}🎒
+                                {% elif item.category == "Books" %}📚
+                                {% else %}📦{% endif %}
+                            </div>
+                        {% endif %}
+
+                        <h3 class="item-title">{{ item.title }}</h3>
+
+                        <p class="item-desc">
+                            {{ item.description[:90] }}{% if item.description|length > 90 %}...{% endif %}
+                        </p>
+
+                        <div class="item-meta">
+                            <span>📍 {{ item.location }}</span>
+                            <span>{{ item.date_submitted[:10] }}</span>
+                        </div>
+
+                        <div class="item-reporter">
+                            Reported by <strong>{{ item.reported_by_name }}</strong>
+                        </div>
+
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="empty">
+                <div class="empty-icon">📭</div>
+                <h3>No submissions yet</h3>
+                <p>Be the first to report an item!</p>
+                {% if current_user %}
+                    <a href="{{ url_for('report') }}" class="btn-accent" style="margin-top:8px">Report an Item</a>
+                {% endif %}
+            </div>
+        {% endif %}
+
+    </div>
+</section>
+{% endblock %}

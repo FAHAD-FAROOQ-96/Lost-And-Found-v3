@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+{% block title %}Admin Panel — Lost & Found{% endblock %}
+
+{% block content %}
+<section class="admin-page">
+    <div class="admin-wrap">
+
+        <!-- Header -->
+        <div class="admin-header">
+            <div>
+                <h1 class="page-title">Admin Panel</h1>
+                <p class="page-sub">Full control over all users, items and settings.</p>
+            </div>
+            <div class="admin-header-actions">
+                <a href="{{ url_for('admin_email_settings') }}" class="btn-outline-sm">⚙️ Email Settings</a>
+                <a href="{{ url_for('admin_add_item') }}"       class="btn-accent">+ Add Item</a>
+            </div>
+        </div>
+
+        <!-- Stats row -->
+        <div class="admin-stats">
+            <div class="astat">
+                <span class="astat-num">{{ total_users }}</span>
+                <span class="astat-label">Total Users</span>
+            </div>
+            <div class="astat">
+                <span class="astat-num">{{ total_items }}</span>
+                <span class="astat-label">Total Items</span>
+            </div>
+            <div class="astat">
+                <span class="astat-num accent">{{ found_items }}</span>
+                <span class="astat-label">Found Items</span>
+            </div>
+            <div class="astat">
+                <span class="astat-num" style="color:var(--red)">{{ lost_items }}</span>
+                <span class="astat-label">Lost Items</span>
+            </div>
+            <div class="astat">
+                <span class="astat-num" style="color:{{ 'var(--green)' if email_settings.enabled else 'var(--muted)' }}">
+                    {{ '✓ ON' if email_settings.enabled else '✗ OFF' }}
+                </span>
+                <span class="astat-label">Email</span>
+            </div>
+        </div>
+
+        <!-- ===== USERS TABLE ===== -->
+        <div class="admin-section">
+            <h2 class="admin-section-title">Users ({{ users|length }})</h2>
+            <div class="admin-table-wrap">
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Role</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for user in users %}
+                        <tr class="{{ 'admin-row' if user.is_admin else '' }}">
+                            <td class="td-name">
+                                {{ user.name }}
+                                {% if user.id == current_user.id %}
+                                    <span class="you-tag">You</span>
+                                {% endif %}
+                            </td>
+                            <td class="td-email">{{ user.email }}</td>
+                            <td>
+                                {% if user.get('is_admin') %}
+                                    <span class="role-badge role-admin">Admin</span>
+                                {% else %}
+                                    <span class="role-badge role-user">Student</span>
+                                {% endif %}
+                            </td>
+                            <td class="td-actions">
+                                {% if user.id != current_user.id %}
+                                    <form method="POST" action="{{ url_for('admin_toggle_admin', user_id=user.id) }}" style="display:inline">
+                                        <button class="btn-table-sm btn-toggle" title="Toggle admin">
+                                            {{ '↓ Remove Admin' if user.is_admin else '↑ Make Admin' }}
+                                        </button>
+                                    </form>
+                                    <form method="POST" action="{{ url_for('admin_delete_user', user_id=user.id) }}"
+                                          style="display:inline"
+                                          onsubmit="return confirm('Delete user {{ user.name }}? This cannot be undone.')">
+                                        <button class="btn-table-sm btn-del">Delete</button>
+                                    </form>
+                                {% else %}
+                                    <span class="td-muted">—</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ===== ITEMS TABLE ===== -->
+        <div class="admin-section">
+            <h2 class="admin-section-title">All Items ({{ items|length }})</h2>
+            <div class="admin-table-wrap">
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>Item</th>
+                            <th>Category</th>
+                            <th>Status</th>
+                            <th>Location</th>
+                            <th>Reported By</th>
+                            <th>Date</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in items %}
+                        <tr>
+                            <td class="td-name">
+                                {% if item.image %}
+                                    <img src="{{ url_for('static', filename='uploads/' + item.image) }}"
+                                         class="admin-thumb" alt="">
+                                {% endif %}
+                                {{ item.title }}
+                            </td>
+                            <td>{{ item.category }}</td>
+                            <td>
+                                <span class="status-tag status-{{ item.status }}">{{ item.status.upper() }}</span>
+                            </td>
+                            <td class="td-muted">{{ item.location }}</td>
+                            <td class="td-muted">{{ item.reported_by_name }}</td>
+                            <td class="td-muted">{{ item.date_submitted[:10] }}</td>
+                            <td class="td-actions">
+                                <a href="{{ url_for('admin_edit_item', item_id=item.id) }}"
+                                   class="btn-table-sm btn-edit">Edit</a>
+                                <form method="POST" action="{{ url_for('admin_delete_item', item_id=item.id) }}"
+                                      style="display:inline"
+                                      onsubmit="return confirm('Delete this item?')">
+                                    <button class="btn-table-sm btn-del">Delete</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+</section>
+{% endblock %}

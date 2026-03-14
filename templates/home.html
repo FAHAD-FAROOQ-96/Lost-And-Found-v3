@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Lost & Found — FAST NUCES Islamabad{% endblock %}
+
+{% block content %}
+
+<section class="hero">
+    <div class="hero-inner">
+
+        <div class="hero-left">
+
+            <div class="hero-badge">
+                <span class="badge-label">NUCES</span>
+                <span class="badge-text">Campus Item Recovery System</span>
+            </div>
+
+            <h1 class="hero-title">
+                Never<br>
+                <span class="accent">Lose</span><br>
+                Track<br>
+                Again
+            </h1>
+
+            <p class="hero-desc">
+                A centralized platform for FAST NUCES Islamabad students
+                to report, find, and recover lost items — smarter and faster.
+            </p>
+
+            <div class="hero-btns">
+                {% if current_user %}
+                    <a href="{{ url_for('report') }}" class="btn-accent">🔶 Report an Item</a>
+                {% else %}
+                    <a href="{{ url_for('login') }}" class="btn-accent">🔶 Report an Item</a>
+                {% endif %}
+                <a href="{{ url_for('submissions') }}" class="btn-ghost">🔍 Browse Submissions</a>
+            </div>
+
+            <div class="hero-stat">
+                <span class="stat-num">{{ total }}</span>
+                <span class="stat-label">Items Reported</span>
+            </div>
+
+        </div>
+
+        <div class="hero-right">
+            <div class="feed-card">
+                <div class="feed-header">
+                    <span class="feed-title">Recently Reported</span>
+                    <span class="live">
+                        <span class="live-dot"></span> Live
+                    </span>
+                </div>
+
+                {% if recent_items %}
+                    {% for item in recent_items %}
+                        <div class="feed-item">
+                            <div class="feed-icon">
+                                {% if item.category == "Electronics" %}📱
+                                {% elif item.category == "ID Card" %}🪪
+                                {% elif item.category == "Wallet" %}👛
+                                {% elif item.category == "Keys" %}🔑
+                                {% elif item.category == "Bag" %}🎒
+                                {% else %}📦{% endif %}
+                            </div>
+                            <div class="feed-info">
+                                <span class="feed-name">{{ item.title }}</span>
+                                <span class="feed-loc">📍 {{ item.location }} · {{ item.date_submitted[:10] }}</span>
+                            </div>
+                            <span class="status-tag status-{{ item.status }}">{{ item.status.upper() }}</span>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <p class="feed-empty">No items reported yet. Be the first!</p>
+                {% endif %}
+
+            </div>
+        </div>
+
+    </div>
+</section>
+
+{% endblock %}

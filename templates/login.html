@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}Log In — Lost & Found{% endblock %}
+
+{% block content %}
+<section class="auth-page">
+    <div class="auth-wrap">
+
+        <div class="auth-left">
+            <h2 class="auth-big">
+                Never<br>
+                <span class="accent">Lose</span><br>
+                Track<br>
+                Again
+            </h2>
+            <p class="auth-sub">FAST NUCES Islamabad<br>Campus Item Recovery System</p>
+        </div>
+
+        <div class="auth-right">
+            <div class="auth-card">
+
+                <h1 class="auth-title">Welcome Back</h1>
+                <p class="auth-hint">Log in with your FAST university account</p>
+
+                <form method="POST" action="{{ url_for('login') }}">
+
+                    <div class="field">
+                        <label for="email">University Email</label>
+                        <input
+                            type="email"
+                            id="email"
+                            name="email"
+                            placeholder="i24XXXX@isb.nu.edu.pk"
+                            required
+                        >
+                    </div>
+
+                    <div class="field">
+                        <label for="password">Password</label>
+                        <input
+                            type="password"
+                            id="password"
+                            name="password"
+                            placeholder="Your password"
+                            required
+                        >
+                    </div>
+
+                    <button type="submit" class="btn-submit">Log In →</button>
+
+                </form>
+
+                <p class="switch-link">
+                    Don't have an account?
+                    <a href="{{ url_for('signup') }}">Sign Up</a>
+                </p>
+
+                <div class="sample-box">
+                    <p class="sample-heading">🧪 Click any account below to auto-fill</p>
+                    <div class="sample-item" data-email="i24-0001@isb.nu.edu.pk" data-pass="password123">
+                        <span>i24-0001@isb.nu.edu.pk</span>
+                        <span class="sample-pw">password123</span>
+                    </div>
+                    <div class="sample-item" data-email="i24-0002@isb.nu.edu.pk" data-pass="password123">
+                        <span>i24-0002@isb.nu.edu.pk</span>
+                        <span class="sample-pw">password123</span>
+                    </div>
+                    <div class="sample-item" data-email="i24-0003@isb.nu.edu.pk" data-pass="password123">
+                        <span>i24-0003@isb.nu.edu.pk</span>
+                        <span class="sample-pw">password123</span>
+                    </div>
+                    <div class="sample-item" data-email="i24-0004@isb.nu.edu.pk" data-pass="password123">
+                        <span>i24-0004@isb.nu.edu.pk</span>
+                        <span class="sample-pw">password123</span>
+                    </div>
+                    <div class="sample-item" data-email="i24-0005@isb.nu.edu.pk" data-pass="password123">
+                        <span>i24-0005@isb.nu.edu.pk</span>
+                        <span class="sample-pw">password123</span>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+    </div>
+</section>
+{% endblock %}

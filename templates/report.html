@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+{% block title %}Report an Item — Lost & Found{% endblock %}
+
+{% block content %}
+<section class="form-page">
+    <div class="form-wrap">
+
+        <h1 class="page-title">Report an Item</h1>
+        <p class="page-sub">
+            Found something on campus? Fill in the details and upload a photo.
+            If it's a student ID card, the system will scan it and offer to email the owner.
+        </p>
+
+        <div class="form-card">
+            <form method="POST" action="{{ url_for('report') }}" enctype="multipart/form-data" id="reportForm">
+
+                <!-- Lost / Found toggle -->
+                <div class="field">
+                    <label>What are you reporting?</label>
+                    <div class="radio-row">
+                        <label class="radio-opt">
+                            <input type="radio" name="status" value="found" checked>
+                            <span>✅ I Found Something</span>
+                        </label>
+                        <label class="radio-opt">
+                            <input type="radio" name="status" value="lost">
+                            <span>❌ I Lost Something</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Title -->
+                <div class="field">
+                    <label for="title">Item Name <span class="req">*</span></label>
+                    <input type="text" id="title" name="title"
+                        placeholder="e.g. Student ID Card, Black iPhone, Wallet" required>
+                </div>
+
+                <!-- Category -->
+                <div class="field">
+                    <label for="category">Category <span class="req">*</span></label>
+                    <select id="category" name="category" required>
+                        <option value="">-- Select --</option>
+                        <option value="ID Card">ID Card / Documents</option>
+                        <option value="Electronics">Electronics</option>
+                        <option value="Wallet">Wallet / Purse</option>
+                        <option value="Keys">Keys</option>
+                        <option value="Bag">Bag / Backpack</option>
+                        <option value="Books">Books / Stationery</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+
+                <!-- IMAGE UPLOAD -->
+                <div class="field">
+                    <label>Photo of Item <span class="opt-tag">Optional</span></label>
+
+                    <div class="upload-area" id="uploadArea">
+                        <div class="upload-inner" id="uploadInner">
+                            <div class="upload-icon">📷</div>
+                            <p class="upload-label">Click to upload or drag & drop</p>
+                            <p class="upload-hint">PNG, JPG, JPEG</p>
+                            <p class="upload-hint" id="idCardHint" style="display:none; color:var(--accent);">
+                                🪪 ID Card selected — will be scanned automatically
+                            </p>
+                        </div>
+                        <input type="file" id="imageInput" accept="image/*" style="display:none">
+                        <input type="hidden" name="uploaded_filename" id="uploadedFilename">
+                        <input type="hidden" name="scanned_roll"      id="scannedRoll">
+                        <input type="hidden" name="scanned_email"     id="scannedEmail">
+                        <input type="hidden" name="scanned_name"      id="scannedName">
+                        <!-- This is set to yes/no by the confirmation buttons below -->
+                        <input type="hidden" name="send_email_choice" id="sendEmailChoice" value="">
+                    </div>
+
+                    <!-- Image preview -->
+                    <div id="imagePreview" style="display:none;">
+                        <img id="previewImg" src="" alt="Preview">
+                        <button type="button" id="removeImage" class="btn-remove-img">✕ Remove</button>
+                    </div>
+
+                    <!-- Scan result + EMAIL CONFIRMATION BOX -->
+                    <div class="scan-box" id="scanBox" style="display:none;">
+
+                        <!-- Scanning spinner -->
+                        <div id="scanStatus" class="scan-status">
+                            <span id="scanSpinner">⏳</span>
+                            <span id="scanText">Scanning ID card...</span>
+                        </div>
+
+                        <!-- Scan result (shown after scan) -->
+                        <div id="scanResult" style="display:none;">
+                            <div class="scan-result-row">
+                                <span class="scan-label">Roll Number</span>
+                                <span class="scan-value" id="resultRoll">—</span>
+                            </div>
+                            <div class="scan-result-row">
+                                <span class="scan-label">Student Name</span>
+                                <span class="scan-value" id="resultName">—</span>
+                            </div>
+                            <div class="scan-result-row">
+                                <span class="scan-label">Email Address</span>
+                                <span class="scan-value accent" id="resultEmail">—</span>
+                            </div>
+
+                            <!-- EMAIL CONFIRMATION — shown after successful scan -->
+                            <div id="emailConfirmBox" class="email-confirm-box" style="display:none;">
+                                <p class="email-confirm-question">
+                                    📧 Send an email notification to this student?
+                                </p>
+                                <div class="email-confirm-btns">
+                                    <button type="button" id="btnSendYes" class="btn-confirm-yes">
+                                        ✅ Yes, Send Email
+                                    </button>
+                                    <button type="button" id="btnSendNo" class="btn-confirm-no">
+                                        ✕ No, Skip
+                                    </button>
+                                </div>
+                                <!-- Shows after choice is made -->
+                                <p id="emailChoiceMsg" class="email-choice-msg" style="display:none;"></p>
+                            </div>
+
+                            <p class="scan-note" id="scanNote"></p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Location -->
+                <div class="field">
+                    <label for="location">Location <span class="req">*</span></label>
+                    <input type="text" id="location" name="location"
+                        placeholder="e.g. Library Ground Floor, Cafeteria, Lab 3" required>
+                </div>
+
+                <!-- Date -->
+                <div class="field">
+                    <label for="date_found">Date</label>
+                    <input type="date" id="date_found" name="date_found">
+                </div>
+
+                <!-- Description -->
+                <div class="field">
+                    <label for="description">Description <span class="req">*</span></label>
+                    <textarea id="description" name="description" rows="4"
+                        placeholder="Describe the item — colour, brand, unique features..." required></textarea>
+                </div>
+
+                <!-- Reporter info -->
+                <div class="reporter-box">
+                    Submitting as: <strong>{{ current_user.name }}</strong>
+                    ({{ current_user.email }})
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn-submit" id="submitBtn">Submit Report</button>
+                    <a href="{{ url_for('home') }}" class="btn-cancel">Cancel</a>
+                </div>
+
+            </form>
+        </div>
+    </div>
+</section>
+
+<script src="{{ url_for('static', filename='js/scan.js') }}"></script>
+{% endblock %}

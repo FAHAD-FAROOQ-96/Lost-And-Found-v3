@@ -1,0 +1,76 @@
+{
+    "users": [
+        {
+            "id": "admin",
+            "name": "Admin",
+            "email": "admin@lostfound.com",
+            "password": "admin123",
+            "is_admin": true
+        },
+        {
+            "id": "u001",
+            "name": "Ali Hassan",
+            "email": "i240001@isb.nu.edu.pk",
+            "password": "password123",
+            "is_admin": false
+        },
+        {
+            "id": "u002",
+            "name": "Sara Khan",
+            "email": "i240002@isb.nu.edu.pk",
+            "password": "password123",
+            "is_admin": false
+        },
+        {
+            "id": "u003",
+            "name": "Ahmed Raza",
+            "email": "i240003@isb.nu.edu.pk",
+            "password": "password123",
+            "is_admin": false
+        },
+        {
+            "id": "u004",
+            "name": "Fatima Malik",
+            "email": "i240004@isb.nu.edu.pk",
+            "password": "password123",
+            "is_admin": false
+        },
+        {
+            "id": "u005",
+            "name": "Usman Tariq",
+            "email": "i240005@isb.nu.edu.pk",
+            "password": "password123",
+            "is_admin": false
+        },
+        {
+            "id": "u007",
+            "name": "Ashhad Saeed",
+            "email": "i240129@isb.nu.edu.pk",
+            "password": "password123",
+            "is_admin": false
+        },
+        {
+            "id": "u008",
+            "name": "Fahad Farooq",
+            "email": "i242071@isb.nu.edu.pk",
+            "password": "password123",
+            "is_admin": false
+        }
+    ],
+    "items": [
+        {
+            "id": "item_7bde675a",
+            "title": "card",
+            "category": "ID Card",
+            "location": "D block",
+            "date_found": "2026-01-01",
+            "description": "c;akbclkbvs",
+            "status": "recovered",
+            "image": "2fcfcd42-b4b.jpeg",
+            "reported_by_id": "u_f7b0a1f0",
+            "reported_by_name": "Fahad Farooq",
+            "reported_by_email": "i242071@isb.nu.edu.pk",
+            "date_submitted": "2026-03-14 22:10"
+        }
+    ]
+}
