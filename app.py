@@ -952,9 +952,9 @@ def signup():
             flash("Please fill in all fields.", "error")
             return render_template("signup.html")
 
-        # Strict university email validation: e.g. i240001@isb.nu.edu.pk or i24-0001@nu.edu.pk
-        if not re.match(r"^i\d{2}-?\d{4}@(isb\.)?nu\.edu\.pk$", email):
-            flash("Please use a valid FAST NUCES student email (e.g. i240001@isb.nu.edu.pk).", "error")
+        # Strict university email validation: exactly 6 digits after 'i' (e.g. i240001@isb.nu.edu.pk)
+        if not re.match(r"^i\d{6}@(isb\.)?nu\.edu\.pk$", email):
+            flash("Please use a valid FAST NUCES student email (e.g. i240001@isb.nu.edu.pk). No hyphens allowed.", "error")
             return render_template("signup.html")
 
         if password != confirm:
