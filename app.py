@@ -1,5 +1,5 @@
 # ============================================================
-# Lost & Found — Iteration 1
+#                    LOST AND FOUND 
 # ============================================================
 
 from flask import Flask, render_template, request, redirect
@@ -53,17 +53,7 @@ EMAIL_SETTINGS_FILE = "email_settings.json"
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp"}
 SUPABASE_URL = os.getenv("SUPABASE_URL", "").strip()
 SUPABASE_KEY = os.getenv("SUPABASE_KEY", "").strip()
-SUPABASE_STATE_TABLE = os.getenv("SUPABASE_STATE_TABLE", "app_state").strip() or "app_state"
-SUPABASE_STATE_ROW_ID = os.getenv("SUPABASE_STATE_ROW_ID", "main").strip() or "main"
 SUPABASE_STORAGE_BUCKET = os.getenv("SUPABASE_STORAGE_BUCKET", "lost-found-uploads").strip() or "lost-found-uploads"
-SUPABASE_DATA_OBJECT_KEY = os.getenv(
-    "SUPABASE_DATA_OBJECT_KEY",
-    f"state/{SUPABASE_STATE_ROW_ID}.json"
-).strip()
-SUPABASE_EMAIL_SETTINGS_OBJECT_KEY = os.getenv(
-    "SUPABASE_EMAIL_SETTINGS_OBJECT_KEY",
-    "email_settings.json"
-).strip()
 _SUPABASE_CLIENT = None
 DEPARTMENTS = [
     "Admin Office",
@@ -93,27 +83,23 @@ def get_supabase_client():
     return _SUPABASE_CLIENT
 
 # ============================================================
-# EMAIL SETTINGS — stored in email_settings.json
-# So the admin can change them from the web UI without
-# editing app.py manually.
+# EMAIL SETTINGS — stored in Supabase DB table `email_settings`
+# Fallback to local file for development without Supabase.
 # ============================================================
 
 def load_email_settings():
-    """
-    Read Gmail credentials.
-
-    Priority:
-    1) Supabase Storage object (persisted on Vercel)
-    2) Local `email_settings.json` fallback (dev)
-    """
+    """Read Gmail credentials from Supabase DB; fallback to local file."""
     client = get_supabase_client()
     if client:
         try:
-            raw = client.storage.from_(SUPABASE_STORAGE_BUCKET).download(
-                SUPABASE_EMAIL_SETTINGS_OBJECT_KEY
-            )
-            if raw:
-                return json.loads(raw.decode("utf-8"))
+            resp = client.table("email_settings").select("*").eq("id", "main").execute()
+            if resp.data and len(resp.data) > 0:
+                row = resp.data[0]
+                return {
+                    "sender":   row.get("sender", ""),
+                    "password": row.get("password", ""),
+                    "enabled":  row.get("enabled", False),
+                }
         except Exception as e:
             print(f"Supabase email-settings load failed; falling back to local file. Error: {e}")
 
@@ -121,32 +107,21 @@ def load_email_settings():
         with open(EMAIL_SETTINGS_FILE, "r") as f:
             return json.load(f)
 
-    return {
-        "sender":   "",
-        "password": "",
-        "enabled":  False
-    }
+    return {"sender": "", "password": "", "enabled": False}
 
 
 def save_email_settings(settings):
-    """
-    Persist Gmail credentials.
-
-    Priority:
-    1) Supabase Storage object
-    2) Local `email_settings.json` fallback
-    """
+    """Persist Gmail credentials to Supabase DB; fallback to local file."""
     client = get_supabase_client()
     if client:
         try:
-            client.storage.from_(SUPABASE_STORAGE_BUCKET).upload(
-                SUPABASE_EMAIL_SETTINGS_OBJECT_KEY,
-                json.dumps(settings).encode("utf-8"),
-                {
-                    "content-type": "application/json",
-                    "x-upsert": "true"
-                }
-            )
+            row = {
+                "id":       "main",
+                "sender":   settings.get("sender", ""),
+                "password": settings.get("password", ""),
+                "enabled":  settings.get("enabled", False),
+            }
+            client.table("email_settings").upsert(row, on_conflict="id").execute()
             return
         except Exception as e:
             print(f"Supabase email-settings save failed; falling back to local file. Error: {e}")
@@ -156,7 +131,8 @@ def save_email_settings(settings):
 
 
 # ============================================================
-# DATA STORAGE (Supabase with local fallback)
+# DATA STORAGE — Supabase Database tables (users + items)
+# Fallback to local data.json for development without Supabase.
 # ============================================================
 
 def _load_local_data():
@@ -166,11 +142,9 @@ def _load_local_data():
             with open(DATA_FILE, "r") as f:
                 content = f.read().strip()
                 if not content:
-                    # File exists but is empty — return blank structure
                     return {"users": [], "items": []}
                 return json.loads(content)
         except json.JSONDecodeError:
-            # File is corrupt — return blank structure
             print("WARNING: data.json is corrupt. Starting fresh.")
             return {"users": [], "items": []}
     return {"users": [], "items": []}
@@ -181,53 +155,226 @@ def _save_local_data(data):
         json.dump(data, f, indent=4)
 
 
+def _user_row_to_dict(row):
+    """Convert a Supabase users table row into the app's user dict format."""
+    return {
+        "id":       row["id"],
+        "name":     row["name"],
+        "email":    row["email"],
+        "password": row["password"],
+        "is_admin": row.get("is_admin", False),
+        "points":   row.get("points", 0),
+    }
+
+
+def _item_row_to_dict(row):
+    """Convert a Supabase items table row into the app's item dict format."""
+    return {
+        "id":                             row["id"],
+        "title":                          row.get("title", ""),
+        "category":                       row.get("category", ""),
+        "location":                       row.get("location", ""),
+        "date_found":                     row.get("date_found", ""),
+        "description":                    row.get("description", ""),
+        "status":                         row.get("status", "found"),
+        "image":                          row.get("image"),
+        "reported_by_id":                 row.get("reported_by_id", ""),
+        "reported_by_name":               row.get("reported_by_name", ""),
+        "reported_by_email":              row.get("reported_by_email", ""),
+        "date_submitted":                 row.get("date_submitted", ""),
+        "submitted_to":                   row.get("submitted_to", "self"),
+        "submitted_department":           row.get("submitted_department", ""),
+        "holder_contact":                 row.get("holder_contact", ""),
+        "department_verification_status": row.get("department_verification_status", "not_required"),
+        "department_verified_by":         row.get("department_verified_by", ""),
+        "department_verified_at":         row.get("department_verified_at", ""),
+        "claim_status":                   row.get("claim_status", "none"),
+        "claim_requested_by":             row.get("claim_requested_by", ""),
+        "claim_requested_at":             row.get("claim_requested_at", ""),
+        "claim_description":              row.get("claim_description", ""),
+        "claim_reviewed_by":              row.get("claim_reviewed_by", ""),
+        "claim_reviewed_at":              row.get("claim_reviewed_at", ""),
+        "claim_review_notes":             row.get("claim_review_notes", ""),
+    }
+
+
 def load_data():
-    """Read app data from Supabase Storage; fallback to local json if unavailable."""
+    """Read users and items from Supabase DB tables; fallback to local data.json."""
     client = get_supabase_client()
     if client:
         try:
-            raw = client.storage.from_(SUPABASE_STORAGE_BUCKET).download(SUPABASE_DATA_OBJECT_KEY)
-            if raw:
-                return json.loads(raw.decode("utf-8"))
+            users_resp = client.table("users").select("*").execute()
+            items_resp = client.table("items").select("*").execute()
+            users = [_user_row_to_dict(r) for r in (users_resp.data or [])]
+            items = [_item_row_to_dict(r) for r in (items_resp.data or [])]
+            return {"users": users, "items": items}
         except Exception as e:
             print(f"Supabase data load failed; falling back to local data.json. Error: {e}")
 
-    local_data = _load_local_data()
-
-    # Bootstrap storage on first run (so future invocations persist).
-    if client:
-        try:
-            client.storage.from_(SUPABASE_STORAGE_BUCKET).upload(
-                SUPABASE_DATA_OBJECT_KEY,
-                json.dumps(local_data).encode("utf-8"),
-                {
-                    "content-type": "application/json",
-                    "x-upsert": "true"
-                }
-            )
-        except Exception as e:
-            print(f"Supabase data bootstrap failed; continuing with local data.json. Error: {e}")
-
-    return local_data
+    return _load_local_data()
 
 
 def save_data(data):
+    """Write full data dict back to Supabase DB (upsert all rows); fallback to local file."""
     client = get_supabase_client()
     if client:
         try:
-            client.storage.from_(SUPABASE_STORAGE_BUCKET).upload(
-                SUPABASE_DATA_OBJECT_KEY,
-                json.dumps(data).encode("utf-8"),
-                {
-                    "content-type": "application/json",
-                    "x-upsert": "true"
+            # Upsert users
+            for user in data.get("users", []):
+                row = {
+                    "id":       user["id"],
+                    "name":     user["name"],
+                    "email":    user["email"],
+                    "password": user["password"],
+                    "is_admin": user.get("is_admin", False),
+                    "points":   user.get("points", 0),
                 }
-            )
+                client.table("users").upsert(row, on_conflict="id").execute()
+
+            # Upsert items
+            for item in data.get("items", []):
+                row = {
+                    "id":                             item["id"],
+                    "title":                          item.get("title", ""),
+                    "category":                       item.get("category", ""),
+                    "location":                       item.get("location", ""),
+                    "date_found":                     item.get("date_found", ""),
+                    "description":                    item.get("description", ""),
+                    "status":                         item.get("status", "found"),
+                    "image":                          item.get("image"),
+                    "reported_by_id":                 item.get("reported_by_id", ""),
+                    "reported_by_name":               item.get("reported_by_name", ""),
+                    "reported_by_email":              item.get("reported_by_email", ""),
+                    "date_submitted":                 item.get("date_submitted", ""),
+                    "submitted_to":                   item.get("submitted_to", "self"),
+                    "submitted_department":           item.get("submitted_department", ""),
+                    "holder_contact":                 item.get("holder_contact", ""),
+                    "department_verification_status": item.get("department_verification_status", "not_required"),
+                    "department_verified_by":         item.get("department_verified_by", ""),
+                    "department_verified_at":         item.get("department_verified_at", ""),
+                    "claim_status":                   item.get("claim_status", "none"),
+                    "claim_requested_by":             item.get("claim_requested_by", ""),
+                    "claim_requested_at":             item.get("claim_requested_at", ""),
+                    "claim_description":              item.get("claim_description", ""),
+                    "claim_reviewed_by":              item.get("claim_reviewed_by", ""),
+                    "claim_reviewed_at":              item.get("claim_reviewed_at", ""),
+                    "claim_review_notes":             item.get("claim_review_notes", ""),
+                }
+                client.table("items").upsert(row, on_conflict="id").execute()
             return
         except Exception as e:
             print(f"Supabase data save failed; writing local data.json. Error: {e}")
 
     _save_local_data(data)
+
+
+# ---- Targeted DB helpers (avoid full save_data round-trips) ----
+
+def save_user(user):
+    """Upsert a single user to Supabase DB; fallback writes full data locally."""
+    client = get_supabase_client()
+    if client:
+        try:
+            row = {
+                "id":       user["id"],
+                "name":     user["name"],
+                "email":    user["email"],
+                "password": user["password"],
+                "is_admin": user.get("is_admin", False),
+                "points":   user.get("points", 0),
+            }
+            client.table("users").upsert(row, on_conflict="id").execute()
+            return
+        except Exception as e:
+            print(f"Supabase save_user failed: {e}")
+    # Fallback: reload full data, patch user, save locally
+    data = _load_local_data()
+    for i, u in enumerate(data["users"]):
+        if u["id"] == user["id"]:
+            data["users"][i] = user
+            break
+    else:
+        data["users"].append(user)
+    _save_local_data(data)
+
+
+def save_item(item):
+    """Upsert a single item to Supabase DB; fallback writes full data locally."""
+    client = get_supabase_client()
+    if client:
+        try:
+            row = {
+                "id":                             item["id"],
+                "title":                          item.get("title", ""),
+                "category":                       item.get("category", ""),
+                "location":                       item.get("location", ""),
+                "date_found":                     item.get("date_found", ""),
+                "description":                    item.get("description", ""),
+                "status":                         item.get("status", "found"),
+                "image":                          item.get("image"),
+                "reported_by_id":                 item.get("reported_by_id", ""),
+                "reported_by_name":               item.get("reported_by_name", ""),
+                "reported_by_email":              item.get("reported_by_email", ""),
+                "date_submitted":                 item.get("date_submitted", ""),
+                "submitted_to":                   item.get("submitted_to", "self"),
+                "submitted_department":           item.get("submitted_department", ""),
+                "holder_contact":                 item.get("holder_contact", ""),
+                "department_verification_status": item.get("department_verification_status", "not_required"),
+                "department_verified_by":         item.get("department_verified_by", ""),
+                "department_verified_at":         item.get("department_verified_at", ""),
+                "claim_status":                   item.get("claim_status", "none"),
+                "claim_requested_by":             item.get("claim_requested_by", ""),
+                "claim_requested_at":             item.get("claim_requested_at", ""),
+                "claim_description":              item.get("claim_description", ""),
+                "claim_reviewed_by":              item.get("claim_reviewed_by", ""),
+                "claim_reviewed_at":              item.get("claim_reviewed_at", ""),
+                "claim_review_notes":             item.get("claim_review_notes", ""),
+            }
+            client.table("items").upsert(row, on_conflict="id").execute()
+            return
+        except Exception as e:
+            print(f"Supabase save_item failed: {e}")
+    # Fallback: reload full data, patch item, save locally
+    data = _load_local_data()
+    for i, it in enumerate(data["items"]):
+        if it["id"] == item["id"]:
+            data["items"][i] = item
+            break
+    else:
+        data["items"].append(item)
+    _save_local_data(data)
+
+
+def delete_user_by_id(user_id):
+    """Delete a single user from Supabase DB; fallback to local file."""
+    client = get_supabase_client()
+    if client:
+        try:
+            client.table("users").delete().eq("id", user_id).execute()
+            return True
+        except Exception as e:
+            print(f"Supabase delete_user failed: {e}")
+    data = _load_local_data()
+    before = len(data["users"])
+    data["users"] = [u for u in data["users"] if u["id"] != user_id]
+    _save_local_data(data)
+    return len(data["users"]) < before
+
+
+def delete_item_by_id(item_id):
+    """Delete a single item from Supabase DB; fallback to local file."""
+    client = get_supabase_client()
+    if client:
+        try:
+            client.table("items").delete().eq("id", item_id).execute()
+            return True
+        except Exception as e:
+            print(f"Supabase delete_item failed: {e}")
+    data = _load_local_data()
+    before = len(data["items"])
+    data["items"] = [i for i in data["items"] if i["id"] != item_id]
+    _save_local_data(data)
+    return len(data["items"]) < before
 
 
 def ensure_item_defaults(item):
@@ -261,14 +408,11 @@ def ensure_item_defaults(item):
 
 
 def ensure_data_defaults(data):
-    changed = False
     for item in data.get("items", []):
         before = dict(item)
         ensure_item_defaults(item)
         if before != item:
-            changed = True
-    if changed:
-        save_data(data)
+            save_item(item)
 
 
 # ============================================================
@@ -301,9 +445,9 @@ def award_points(user_id, status):
             else:
                 user["points"] = user["points"] + POINTS_FOR_LOST
                 print(f"Awarded {POINTS_FOR_LOST} pts to {user['name']} (lost item)")
-            break
 
-    save_data(data)
+            save_user(user)
+            break
 
 
 # ============================================================
@@ -347,10 +491,10 @@ def run_archiving():
 
         if age_days >= ARCHIVE_AFTER_DAYS:
             item["status"] = "archived"
+            save_item(item)
             changed += 1
 
     if changed > 0:
-        save_data(data)
         print(f"Auto-archived {changed} item(s) older than {ARCHIVE_AFTER_DAYS} days.")
 
 
@@ -401,7 +545,8 @@ def setup_sample_data():
                 "name":     "Admin",
                 "email":    "admin@lostfound.com",
                 "password": "admin123",
-                "is_admin": True
+                "is_admin": True,
+                "points":   0
             },
             # ---- Regular student accounts ----
             {"id": "u001", "name": "Ali Hassan",  "email": "i24-0001@isb.nu.edu.pk", "password": "password123", "is_admin": False, "points": 150},
@@ -413,8 +558,8 @@ def setup_sample_data():
             {"id": "u007", "name": "Ashhad Saeed","email": "i24-0129@isb.nu.edu.pk", "password": "password123", "is_admin": False, "points": 25},
             {"id": "u008", "name": "Fahad Farooq","email": "i24-2071@isb.nu.edu.pk", "password": "password123", "is_admin": False, "points": 100},
         ]
-        data["users"] = sample_users
-        save_data(data)
+        for user in sample_users:
+            save_user(user)
 
 
 # ============================================================
@@ -750,10 +895,10 @@ def signup():
             "name":     name,
             "email":    email,
             "password": password,
-            "is_admin": False
+            "is_admin": False,
+            "points":   0
         }
-        data["users"].append(new_user)
-        save_data(data)
+        save_user(new_user)
 
         session["user_id"] = new_user["id"]
         flash(f"Account created! Welcome, {name}!", "success")
@@ -864,7 +1009,7 @@ def submission_detail(item_id):
         target["claim_reviewed_by"] = ""
         target["claim_reviewed_at"] = ""
         target["claim_review_notes"] = ""
-        save_data(data)
+        save_item(target)
         flash("Claim request submitted. Admin will verify your details.", "success")
         return redirect(url_for("submission_detail", item_id=item_id))
 
@@ -955,9 +1100,7 @@ def report():
             "claim_review_notes": ""
         }
 
-        data = load_data()
-        data["items"].append(new_item)
-        save_data(data)
+        save_item(new_item)
 
         # ---- AWARD POINTS ----
         # Give the reporter points for submitting this report
@@ -1237,7 +1380,7 @@ def admin_verify_department(item_id):
             item["department_verification_status"] = "verified"
             item["department_verified_by"] = current_user["name"]
             item["department_verified_at"] = datetime.now().strftime("%Y-%m-%d %H:%M")
-            save_data(data)
+            save_item(item)
             flash(f"Department verification recorded for {item['title']}.", "success")
             return redirect(url_for("admin_panel"))
 
@@ -1277,7 +1420,7 @@ def admin_review_claim(item_id):
             if decision == "approved":
                 item["status"] = "recovered"
 
-            save_data(data)
+            save_item(item)
             flash(f"Claim {decision} for {item['title']}.", "success")
             return redirect(url_for("admin_panel"))
 
@@ -1289,11 +1432,7 @@ def admin_review_claim(item_id):
 @require_admin
 def admin_delete_item(item_id):
     """Admin: delete any item"""
-    data = load_data()
-    before = len(data["items"])
-    data["items"] = [i for i in data["items"] if i["id"] != item_id]
-    save_data(data)
-    if len(data["items"]) < before:
+    if delete_item_by_id(item_id):
         flash("Item deleted.", "success")
     else:
         flash("Item not found.", "error")
@@ -1347,7 +1486,7 @@ def admin_edit_item(item_id):
             target["department_verified_by"] = ""
             target["department_verified_at"] = ""
 
-        save_data(data)
+        save_item(target)
         flash("Item updated.", "success")
         return redirect(url_for("admin_panel"))
 
@@ -1367,12 +1506,7 @@ def admin_delete_user(user_id):
         flash("You cannot delete your own admin account.", "error")
         return redirect(url_for("admin_panel"))
 
-    data = load_data()
-    before = len(data["users"])
-    data["users"] = [u for u in data["users"] if u["id"] != user_id]
-    save_data(data)
-
-    if len(data["users"]) < before:
+    if delete_user_by_id(user_id):
         flash("User deleted.", "success")
     else:
         flash("User not found.", "error")
@@ -1394,10 +1528,10 @@ def admin_toggle_admin(user_id):
         if user["id"] == user_id:
             user["is_admin"] = not user.get("is_admin", False)
             status = "granted" if user["is_admin"] else "revoked"
+            save_user(user)
             flash(f"Admin access {status} for {user['name']}.", "success")
             break
 
-    save_data(data)
     return redirect(url_for("admin_panel"))
 
 
@@ -1507,9 +1641,7 @@ def admin_add_item():
             "claim_review_notes": ""
         }
 
-        data = load_data()
-        data["items"].append(new_item)
-        save_data(data)
+        save_item(new_item)
         flash("Item added successfully.", "success")
         return redirect(url_for("admin_panel"))
 
