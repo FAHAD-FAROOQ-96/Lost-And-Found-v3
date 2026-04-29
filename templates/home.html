@@ -34,6 +34,12 @@
                 <a href="{{ url_for('submissions') }}" class="btn-ghost">🔍 Browse Submissions</a>
             </div>
 
+            <!-- Quick links row -->
+            <div class="hero-quicklinks">
+                <a href="{{ url_for('leaderboard') }}" class="quicklink">🏆 Leaderboard</a>
+                <a href="{{ url_for('archive') }}"     class="quicklink">📦 Archive</a>
+            </div>
+
             <div class="hero-stat">
                 <span class="stat-num">{{ total }}</span>
                 <span class="stat-label">Items Reported</span>

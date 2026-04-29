@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}Archive — Lost & Found{% endblock %}
+
+{% block content %}
+<section class="list-page">
+    <div class="list-wrap">
+
+        <div class="list-header">
+            <div>
+                <h1 class="page-title">Archive</h1>
+                <p class="page-sub">
+                    Items that were reported but remained unclaimed for
+                    <strong>60 days</strong> are automatically moved here.
+                </p>
+            </div>
+        </div>
+
+        <!-- Info banner -->
+        <div class="archive-info-box">
+            <span class="archive-info-icon">📦</span>
+            <div>
+                <p class="archive-info-title">About the Archive</p>
+                <p class="archive-info-text">
+                    Any found or lost item that is not resolved within 60 days is
+                    automatically archived by the system. Archived items are kept
+                    for record-keeping purposes. If you recognise your item here,
+                    please contact the university Lost &amp; Found desk.
+                </p>
+            </div>
+        </div>
+
+        {% if items %}
+            <p class="results-count">{{ items|length }} archived item(s)</p>
+
+            <div class="items-grid">
+                {% for item in items %}
+                    <div class="item-card archived-card">
+
+                        <div class="item-top">
+                            <span class="cat-tag">{{ item.category }}</span>
+                            <span class="status-tag status-archived">ARCHIVED</span>
+                        </div>
+
+                        {% if item.image %}
+                            <img class="item-thumb"
+                                 src="{{ image_src(item.image) }}"
+                                 alt="{{ item.title }}">
+                        {% else %}
+                            <div class="item-icon">
+                                {% if item.category == "Electronics" %}📱
+                                {% elif item.category == "ID Card" %}🪪
+                                {% elif item.category == "Wallet" %}👛
+                                {% elif item.category == "Keys" %}🔑
+                                {% elif item.category == "Bag" %}🎒
+                                {% elif item.category == "Books" %}📚
+                                {% else %}📦{% endif %}
+                            </div>
+                        {% endif %}
+
+                        <h3 class="item-title">{{ item.title }}</h3>
+
+                        <p class="item-desc">
+                            {{ item.description[:90] }}{% if item.description|length > 90 %}...{% endif %}
+                        </p>
+
+                        <div class="item-meta">
+                            <span>📍 {{ item.location }}</span>
+                            <span>Submitted: {{ item.date_submitted[:10] }}</span>
+                        </div>
+
+                        <div class="item-reporter">
+                            Reported by <strong>{{ item.reported_by_name }}</strong>
+                        </div>
+
+                    </div>
+                {% endfor %}
+            </div>
+
+        {% else %}
+            <div class="empty">
+                <div class="empty-icon">📭</div>
+                <h3>No archived items</h3>
+                <p>Items older than 60 days will appear here automatically.</p>
+            </div>
+        {% endif %}
+
+    </div>
+</section>
+{% endblock %}

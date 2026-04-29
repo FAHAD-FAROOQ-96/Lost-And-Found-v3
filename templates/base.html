@@ -22,6 +22,10 @@
                    class="nav-link {% if request.endpoint == 'home' %}active{% endif %}">Home</a>
                 <a href="{{ url_for('submissions') }}"
                    class="nav-link {% if request.endpoint == 'submissions' %}active{% endif %}">Submissions</a>
+                <a href="{{ url_for('leaderboard') }}"
+                   class="nav-link {% if request.endpoint == 'leaderboard' %}active{% endif %}">🏆 Leaderboard</a>
+                <a href="{{ url_for('archive') }}"
+                   class="nav-link {% if request.endpoint == 'archive' %}active{% endif %}">📦 Archive</a>
                 {% if current_user and current_user.get('is_admin') %}
                     <a href="{{ url_for('admin_panel') }}"
                        class="nav-link admin-link {% if 'admin' in request.endpoint %}active{% endif %}">⚙ Admin</a>

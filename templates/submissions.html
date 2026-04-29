@@ -17,6 +17,32 @@
             {% endif %}
         </div>
 
+        <form method="GET" action="{{ url_for('submissions') }}" class="search-panel">
+            <input type="text" name="q" placeholder="Search by name, keyword, location, reporter..."
+                   value="{{ search_filters.q }}">
+            <select name="category">
+                <option value="">All Categories</option>
+                {% for c in categories %}
+                    <option value="{{ c }}" {{ 'selected' if search_filters.category == c else '' }}>{{ c }}</option>
+                {% endfor %}
+            </select>
+            <select name="status">
+                <option value="">All Statuses</option>
+                {% for s in ['found', 'lost', 'recovered', 'archived'] %}
+                    <option value="{{ s }}" {{ 'selected' if search_filters.status == s else '' }}>{{ s|upper }}</option>
+                {% endfor %}
+            </select>
+            <select name="submitted_to">
+                <option value="">Holder: Anyone</option>
+                <option value="department" {{ 'selected' if search_filters.submitted_to == 'department' else '' }}>Held by Department</option>
+                <option value="self" {{ 'selected' if search_filters.submitted_to == 'self' else '' }}>Held by Reporter</option>
+            </select>
+            <input type="date" name="date_from" value="{{ search_filters.date_from }}">
+            <input type="date" name="date_to" value="{{ search_filters.date_to }}">
+            <button type="submit" class="btn-outline-sm">Search</button>
+            <a href="{{ url_for('submissions') }}" class="btn-cancel">Reset</a>
+        </form>
+
         {% if items %}
             <div class="items-grid">
                 {% for item in items %}
@@ -29,7 +55,7 @@
 
                         {% if item.image %}
                             <img class="item-thumb"
-                                 src="{{ url_for('static', filename='uploads/' + item.image) }}"
+                                 src="{{ image_src(item.image) }}"
                                  alt="{{ item.title }}">
                         {% else %}
                             <div class="item-icon">
@@ -57,6 +83,16 @@
                         <div class="item-reporter">
                             Reported by <strong>{{ item.reported_by_name }}</strong>
                         </div>
+
+                        <div class="item-custody">
+                            {% if item.submitted_to == 'department' %}
+                                Submitted to <strong>{{ item.submitted_department }}</strong>
+                            {% else %}
+                                Item currently with <strong>{{ item.reported_by_name }}</strong>
+                            {% endif %}
+                        </div>
+
+                        <a href="{{ url_for('submission_detail', item_id=item.id) }}" class="btn-outline-sm">View Details</a>
 
                     </div>
                 {% endfor %}

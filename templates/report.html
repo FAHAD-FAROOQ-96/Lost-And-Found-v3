@@ -145,6 +145,30 @@
                         placeholder="Describe the item — colour, brand, unique features..." required></textarea>
                 </div>
 
+                <div class="field">
+                    <label for="submitted_to">Where are you submitting this item?</label>
+                    <select id="submitted_to" name="submitted_to">
+                        <option value="self">I will keep it with me</option>
+                        <option value="department">I am submitting it to a department</option>
+                    </select>
+                </div>
+
+                <div class="field" id="departmentField" style="display:none;">
+                    <label for="submitted_department">Department <span class="req">*</span></label>
+                    <select id="submitted_department" name="submitted_department">
+                        <option value="">-- Select Department --</option>
+                        {% for dept in departments %}
+                            <option value="{{ dept }}">{{ dept }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="field" id="contactField">
+                    <label for="holder_contact">Contact Number <span class="req">*</span></label>
+                    <input type="text" id="holder_contact" name="holder_contact"
+                        placeholder="Required when you keep the item yourself">
+                </div>
+
                 <!-- Reporter info -->
                 <div class="reporter-box">
                     Submitting as: <strong>{{ current_user.name }}</strong>
@@ -162,4 +186,53 @@
 </section>
 
 <script src="{{ url_for('static', filename='js/scan.js') }}"></script>
+<script>
+    (function () {
+        var statusInputs = document.querySelectorAll('input[name="status"]')
+        var submittedTo = document.getElementById("submitted_to")
+        var deptField = document.getElementById("departmentField")
+        var deptInput = document.getElementById("submitted_department")
+        var contactField = document.getElementById("contactField")
+        var contactInput = document.getElementById("holder_contact")
+
+        function selectedStatus() {
+            for (var i = 0; i < statusInputs.length; i++) {
+                if (statusInputs[i].checked) return statusInputs[i].value
+            }
+            return "found"
+        }
+
+        function syncFields() {
+            var isFound = selectedStatus() === "found"
+            var toDept = submittedTo.value === "department"
+
+            submittedTo.disabled = !isFound
+            if (!isFound) {
+                deptField.style.display = "none"
+                contactField.style.display = "none"
+                deptInput.required = false
+                contactInput.required = false
+                return
+            }
+
+            if (toDept) {
+                deptField.style.display = "block"
+                contactField.style.display = "none"
+                deptInput.required = true
+                contactInput.required = false
+            } else {
+                deptField.style.display = "none"
+                contactField.style.display = "block"
+                deptInput.required = false
+                contactInput.required = true
+            }
+        }
+
+        for (var i = 0; i < statusInputs.length; i++) {
+            statusInputs[i].addEventListener("change", syncFields)
+        }
+        submittedTo.addEventListener("change", syncFields)
+        syncFields()
+    })()
+</script>
 {% endblock %}

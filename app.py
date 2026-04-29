@@ -12,14 +12,33 @@ from datetime import datetime
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from PIL import Image, ImageFilter
-import pytesseract
-import numpy as np
+try:
+    from supabase import create_client
+except Exception:
+    create_client = None
+try:
+    from PIL import Image, ImageFilter
+    import pytesseract
+    import numpy as np
+    OCR_AVAILABLE = True
+except Exception:
+    Image = None
+    ImageFilter = None
+    pytesseract = None
+    np = None
+    OCR_AVAILABLE = False
 
 # ============================================================
-# TESSERACT PATH — required on Windows
+# TESSERACT PATH
 # ============================================================
-pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+if OCR_AVAILABLE and pytesseract is not None:
+    tesseract_cmd = os.getenv("TESSERACT_CMD", "").strip()
+    if tesseract_cmd:
+        pytesseract.pytesseract.tesseract_cmd = tesseract_cmd
+    elif os.name == "nt":
+        default_tesseract = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+        if os.path.exists(default_tesseract):
+            pytesseract.pytesseract.tesseract_cmd = default_tesseract
 
 app = Flask(__name__)
 app.secret_key = "lostfound_iter1_secret"
@@ -32,9 +51,46 @@ UPLOAD_FOLDER      = os.path.join("static", "uploads")
 DATA_FILE          = "data.json"
 EMAIL_SETTINGS_FILE = "email_settings.json"
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp"}
+SUPABASE_URL = os.getenv("SUPABASE_URL", "").strip()
+SUPABASE_KEY = os.getenv("SUPABASE_KEY", "").strip()
+SUPABASE_STATE_TABLE = os.getenv("SUPABASE_STATE_TABLE", "app_state").strip() or "app_state"
+SUPABASE_STATE_ROW_ID = os.getenv("SUPABASE_STATE_ROW_ID", "main").strip() or "main"
+SUPABASE_STORAGE_BUCKET = os.getenv("SUPABASE_STORAGE_BUCKET", "lost-found-uploads").strip() or "lost-found-uploads"
+SUPABASE_DATA_OBJECT_KEY = os.getenv(
+    "SUPABASE_DATA_OBJECT_KEY",
+    f"state/{SUPABASE_STATE_ROW_ID}.json"
+).strip()
+SUPABASE_EMAIL_SETTINGS_OBJECT_KEY = os.getenv(
+    "SUPABASE_EMAIL_SETTINGS_OBJECT_KEY",
+    "email_settings.json"
+).strip()
+_SUPABASE_CLIENT = None
+DEPARTMENTS = [
+    "Admin Office",
+    "Admission Office",
+    "One-Stop Office",
+    "Library"
+]
 
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
+
+
+def get_supabase_client():
+    """Create and cache Supabase client when environment is configured."""
+    global _SUPABASE_CLIENT
+    if _SUPABASE_CLIENT is not None:
+        return _SUPABASE_CLIENT
+
+    if create_client is None or not SUPABASE_URL or not SUPABASE_KEY:
+        return None
+
+    try:
+        _SUPABASE_CLIENT = create_client(SUPABASE_URL, SUPABASE_KEY)
+    except Exception as e:
+        print(f"Supabase initialization failed: {e}")
+        _SUPABASE_CLIENT = None
+    return _SUPABASE_CLIENT
 
 # ============================================================
 # EMAIL SETTINGS — stored in email_settings.json
@@ -43,10 +99,28 @@ if not os.path.exists(UPLOAD_FOLDER):
 # ============================================================
 
 def load_email_settings():
-    """Read Gmail credentials from file"""
+    """
+    Read Gmail credentials.
+
+    Priority:
+    1) Supabase Storage object (persisted on Vercel)
+    2) Local `email_settings.json` fallback (dev)
+    """
+    client = get_supabase_client()
+    if client:
+        try:
+            raw = client.storage.from_(SUPABASE_STORAGE_BUCKET).download(
+                SUPABASE_EMAIL_SETTINGS_OBJECT_KEY
+            )
+            if raw:
+                return json.loads(raw.decode("utf-8"))
+        except Exception as e:
+            print(f"Supabase email-settings load failed; falling back to local file. Error: {e}")
+
     if os.path.exists(EMAIL_SETTINGS_FILE):
         with open(EMAIL_SETTINGS_FILE, "r") as f:
             return json.load(f)
+
     return {
         "sender":   "",
         "password": "",
@@ -55,17 +129,38 @@ def load_email_settings():
 
 
 def save_email_settings(settings):
-    """Write Gmail credentials to file"""
+    """
+    Persist Gmail credentials.
+
+    Priority:
+    1) Supabase Storage object
+    2) Local `email_settings.json` fallback
+    """
+    client = get_supabase_client()
+    if client:
+        try:
+            client.storage.from_(SUPABASE_STORAGE_BUCKET).upload(
+                SUPABASE_EMAIL_SETTINGS_OBJECT_KEY,
+                json.dumps(settings).encode("utf-8"),
+                {
+                    "content-type": "application/json",
+                    "x-upsert": "true"
+                }
+            )
+            return
+        except Exception as e:
+            print(f"Supabase email-settings save failed; falling back to local file. Error: {e}")
+
     with open(EMAIL_SETTINGS_FILE, "w") as f:
         json.dump(settings, f, indent=4)
 
 
 # ============================================================
-# DATA FILE
+# DATA STORAGE (Supabase with local fallback)
 # ============================================================
 
-def load_data():
-    """Read data.json — handles missing, empty, or corrupt file safely"""
+def _load_local_data():
+    """Read data.json safely."""
     if os.path.exists(DATA_FILE):
         try:
             with open(DATA_FILE, "r") as f:
@@ -81,9 +176,182 @@ def load_data():
     return {"users": [], "items": []}
 
 
-def save_data(data):
+def _save_local_data(data):
     with open(DATA_FILE, "w") as f:
         json.dump(data, f, indent=4)
+
+
+def load_data():
+    """Read app data from Supabase Storage; fallback to local json if unavailable."""
+    client = get_supabase_client()
+    if client:
+        try:
+            raw = client.storage.from_(SUPABASE_STORAGE_BUCKET).download(SUPABASE_DATA_OBJECT_KEY)
+            if raw:
+                return json.loads(raw.decode("utf-8"))
+        except Exception as e:
+            print(f"Supabase data load failed; falling back to local data.json. Error: {e}")
+
+    local_data = _load_local_data()
+
+    # Bootstrap storage on first run (so future invocations persist).
+    if client:
+        try:
+            client.storage.from_(SUPABASE_STORAGE_BUCKET).upload(
+                SUPABASE_DATA_OBJECT_KEY,
+                json.dumps(local_data).encode("utf-8"),
+                {
+                    "content-type": "application/json",
+                    "x-upsert": "true"
+                }
+            )
+        except Exception as e:
+            print(f"Supabase data bootstrap failed; continuing with local data.json. Error: {e}")
+
+    return local_data
+
+
+def save_data(data):
+    client = get_supabase_client()
+    if client:
+        try:
+            client.storage.from_(SUPABASE_STORAGE_BUCKET).upload(
+                SUPABASE_DATA_OBJECT_KEY,
+                json.dumps(data).encode("utf-8"),
+                {
+                    "content-type": "application/json",
+                    "x-upsert": "true"
+                }
+            )
+            return
+        except Exception as e:
+            print(f"Supabase data save failed; writing local data.json. Error: {e}")
+
+    _save_local_data(data)
+
+
+def ensure_item_defaults(item):
+    """Backfill newly introduced workflow fields for older item records."""
+    if "submitted_to" not in item:
+        item["submitted_to"] = "self"
+    if "submitted_department" not in item:
+        item["submitted_department"] = ""
+    if "holder_contact" not in item:
+        item["holder_contact"] = ""
+    if "department_verification_status" not in item:
+        item["department_verification_status"] = "not_required"
+    if "department_verified_by" not in item:
+        item["department_verified_by"] = ""
+    if "department_verified_at" not in item:
+        item["department_verified_at"] = ""
+    if "claim_status" not in item:
+        item["claim_status"] = "none"
+    if "claim_requested_by" not in item:
+        item["claim_requested_by"] = ""
+    if "claim_requested_at" not in item:
+        item["claim_requested_at"] = ""
+    if "claim_description" not in item:
+        item["claim_description"] = ""
+    if "claim_reviewed_by" not in item:
+        item["claim_reviewed_by"] = ""
+    if "claim_reviewed_at" not in item:
+        item["claim_reviewed_at"] = ""
+    if "claim_review_notes" not in item:
+        item["claim_review_notes"] = ""
+
+
+def ensure_data_defaults(data):
+    changed = False
+    for item in data.get("items", []):
+        before = dict(item)
+        ensure_item_defaults(item)
+        if before != item:
+            changed = True
+    if changed:
+        save_data(data)
+
+
+# ============================================================
+# POINTS SYSTEM
+# Points awarded when a user submits a report:
+#   Found item  → +50 points
+#   Lost item   → +25 points
+# ============================================================
+
+POINTS_FOR_FOUND = 50
+POINTS_FOR_LOST  = 25
+
+
+def award_points(user_id, status):
+    """
+    Add reward points to a user's account.
+    Called every time they successfully submit a report.
+    """
+    data = load_data()
+
+    for user in data["users"]:
+        if user["id"] == user_id:
+            # Add points field if it doesn't exist yet (old accounts)
+            if "points" not in user:
+                user["points"] = 0
+
+            if status == "found":
+                user["points"] = user["points"] + POINTS_FOR_FOUND
+                print(f"Awarded {POINTS_FOR_FOUND} pts to {user['name']} (found item)")
+            else:
+                user["points"] = user["points"] + POINTS_FOR_LOST
+                print(f"Awarded {POINTS_FOR_LOST} pts to {user['name']} (lost item)")
+            break
+
+    save_data(data)
+
+
+# ============================================================
+# AUTO-ARCHIVING
+# Items that are still "found" or "lost" after 60 days
+# are automatically moved to status = "archived".
+# This function runs on every page load — no cron job needed.
+# ============================================================
+
+ARCHIVE_AFTER_DAYS = 60
+
+
+def run_archiving():
+    """
+    Check all items and archive any that are older than 60 days.
+    Only affects items with status 'found' or 'lost'.
+    Items already 'recovered' or 'archived' are left alone.
+    """
+    data    = load_data()
+    today   = datetime.now().date()
+    changed = 0
+
+    for item in data["items"]:
+        # Skip already-archived or recovered items
+        if item["status"] in ("archived", "recovered"):
+            continue
+
+        # Get the date the item was submitted
+        date_str = item.get("date_submitted", "")
+        if not date_str:
+            continue
+
+        try:
+            # date_submitted format is "YYYY-MM-DD HH:MM"
+            submitted_date = datetime.strptime(date_str[:10], "%Y-%m-%d").date()
+        except ValueError:
+            continue
+
+        # Calculate how many days old this item is
+        age_days = (today - submitted_date).days
+
+        if age_days >= ARCHIVE_AFTER_DAYS:
+            item["status"] = "archived"
+            changed += 1
+
+    if changed > 0:
+        save_data(data)
+        print(f"Auto-archived {changed} item(s) older than {ARCHIVE_AFTER_DAYS} days.")
 
 
 # ============================================================
@@ -136,14 +404,14 @@ def setup_sample_data():
                 "is_admin": True
             },
             # ---- Regular student accounts ----
-            {"id": "u001", "name": "Ali Hassan",  "email": "i24-0001@isb.nu.edu.pk", "password": "password123", "is_admin": False},
-            {"id": "u002", "name": "Sara Khan",   "email": "i24-0002@isb.nu.edu.pk", "password": "password123", "is_admin": False},
-            {"id": "u003", "name": "Ahmed Raza",  "email": "i24-0003@isb.nu.edu.pk", "password": "password123", "is_admin": False},
-            {"id": "u004", "name": "Fatima Malik","email": "i24-0004@isb.nu.edu.pk", "password": "password123", "is_admin": False},
-            {"id": "u005", "name": "Usman Tariq", "email": "i24-0005@isb.nu.edu.pk", "password": "password123", "is_admin": False},
-            {"id": "u006", "name": "Musa Javed",  "email": "i24-0031@isb.nu.edu.pk", "password": "password123", "is_admin": False},
-            {"id": "u007", "name": "Ashhad Saeed","email": "i24-0129@isb.nu.edu.pk", "password": "password123", "is_admin": False},
-            {"id": "u008", "name": "Fahad Farooq","email": "i24-2071@isb.nu.edu.pk", "password": "password123", "is_admin": False},
+            {"id": "u001", "name": "Ali Hassan",  "email": "i24-0001@isb.nu.edu.pk", "password": "password123", "is_admin": False, "points": 150},
+            {"id": "u002", "name": "Sara Khan",   "email": "i24-0002@isb.nu.edu.pk", "password": "password123", "is_admin": False, "points": 200},
+            {"id": "u003", "name": "Ahmed Raza",  "email": "i24-0003@isb.nu.edu.pk", "password": "password123", "is_admin": False, "points": 75},
+            {"id": "u004", "name": "Fatima Malik","email": "i24-0004@isb.nu.edu.pk", "password": "password123", "is_admin": False, "points": 320},
+            {"id": "u005", "name": "Usman Tariq", "email": "i24-0005@isb.nu.edu.pk", "password": "password123", "is_admin": False, "points": 90},
+            {"id": "u006", "name": "Musa Javed",  "email": "i24-0031@isb.nu.edu.pk", "password": "password123", "is_admin": False, "points": 50},
+            {"id": "u007", "name": "Ashhad Saeed","email": "i24-0129@isb.nu.edu.pk", "password": "password123", "is_admin": False, "points": 25},
+            {"id": "u008", "name": "Fahad Farooq","email": "i24-2071@isb.nu.edu.pk", "password": "password123", "is_admin": False, "points": 100},
         ]
         data["users"] = sample_users
         save_data(data)
@@ -223,6 +491,26 @@ def save_uploaded_image(file):
         return None
     ext = file.filename.rsplit(".", 1)[1].lower()
     unique_name = str(uuid.uuid4())[:12] + "." + ext
+
+    # Try Supabase Storage first when configured.
+    client = get_supabase_client()
+    if client:
+        try:
+            file_bytes = file.read()
+            file.stream.seek(0)
+            path = f"uploads/{unique_name}"
+            content_type = "image/jpeg" if ext == "jpg" else f"image/{ext}"
+            client.storage.from_(SUPABASE_STORAGE_BUCKET).upload(
+                path,
+                file_bytes,
+                {"content-type": content_type}
+            )
+            public_url = client.storage.from_(SUPABASE_STORAGE_BUCKET).get_public_url(path)
+            if public_url:
+                return public_url
+        except Exception as e:
+            print(f"Supabase image upload failed; storing locally. Error: {e}")
+
     file.save(os.path.join(UPLOAD_FOLDER, unique_name))
     return unique_name
 
@@ -269,6 +557,10 @@ def ocr_scan_id_card(image_path):
     Multi-pass OCR scan for FAST NUCES ID cards.
     Returns (roll_string_or_None, student_dict_or_None)
     """
+    if not OCR_AVAILABLE:
+        print("OCR dependencies are unavailable in this environment.")
+        return None, None
+
     try:
         img = Image.open(image_path)
         w, h = img.size
@@ -374,7 +666,9 @@ def require_admin(f):
 
 @app.route("/")
 def home():
+    run_archiving()   # archive items older than 60 days on every home page visit
     data         = load_data()
+    ensure_data_defaults(data)
     current_user = get_logged_in_user()
     recent_items = list(reversed(data["items"][-3:]))
     total        = len(data["items"])
@@ -477,10 +771,107 @@ def logout():
 
 @app.route("/submissions")
 def submissions():
+    run_archiving()   # archive items older than 60 days
     current_user = get_logged_in_user()
     data         = load_data()
-    items        = list(reversed(data["items"]))
-    return render_template("submissions.html", current_user=current_user, items=items)
+    ensure_data_defaults(data)
+
+    q = request.args.get("q", "").strip().lower()
+    category = request.args.get("category", "").strip()
+    item_status = request.args.get("status", "").strip()
+    date_from = request.args.get("date_from", "").strip()
+    date_to = request.args.get("date_to", "").strip()
+    submitted_to = request.args.get("submitted_to", "").strip()
+
+    filtered = []
+    for item in data["items"]:
+        haystack = " ".join([
+            item.get("title", ""),
+            item.get("description", ""),
+            item.get("category", ""),
+            item.get("location", ""),
+            item.get("reported_by_name", "")
+        ]).lower()
+        if q and q not in haystack:
+            continue
+        if category and item.get("category") != category:
+            continue
+        if item_status and item.get("status") != item_status:
+            continue
+        if submitted_to and item.get("submitted_to", "self") != submitted_to:
+            continue
+
+        submitted_day = item.get("date_submitted", "")[:10]
+        if date_from and submitted_day and submitted_day < date_from:
+            continue
+        if date_to and submitted_day and submitted_day > date_to:
+            continue
+
+        filtered.append(item)
+
+    items = list(reversed(filtered))
+    categories = sorted({i.get("category", "") for i in data["items"] if i.get("category")})
+    return render_template("submissions.html",
+        current_user=current_user,
+        items=items,
+        categories=categories,
+        departments=DEPARTMENTS,
+        search_filters={
+            "q": q,
+            "category": category,
+            "status": item_status,
+            "date_from": date_from,
+            "date_to": date_to,
+            "submitted_to": submitted_to
+        }
+    )
+
+
+@app.route("/submissions/<item_id>", methods=["GET", "POST"])
+def submission_detail(item_id):
+    current_user = get_logged_in_user()
+    data = load_data()
+    ensure_data_defaults(data)
+
+    target = None
+    for item in data["items"]:
+        if item["id"] == item_id:
+            target = item
+            break
+
+    if not target:
+        flash("Submission not found.", "error")
+        return redirect(url_for("submissions"))
+
+    if request.method == "POST":
+        if not current_user:
+            flash("Please log in to request a claim.", "error")
+            return redirect(url_for("login"))
+
+        claim_description = request.form.get("claim_description", "").strip()
+        if not claim_description:
+            flash("Please provide claim details for verification.", "error")
+            return redirect(url_for("submission_detail", item_id=item_id))
+
+        if target.get("claim_status") == "pending":
+            flash("A claim is already pending admin review.", "info")
+            return redirect(url_for("submission_detail", item_id=item_id))
+
+        target["claim_status"] = "pending"
+        target["claim_requested_by"] = current_user["name"]
+        target["claim_requested_at"] = datetime.now().strftime("%Y-%m-%d %H:%M")
+        target["claim_description"] = claim_description
+        target["claim_reviewed_by"] = ""
+        target["claim_reviewed_at"] = ""
+        target["claim_review_notes"] = ""
+        save_data(data)
+        flash("Claim request submitted. Admin will verify your details.", "success")
+        return redirect(url_for("submission_detail", item_id=item_id))
+
+    return render_template("submission_detail.html",
+        current_user=current_user,
+        item=target
+    )
 
 
 # ============================================================
@@ -501,6 +892,9 @@ def report():
         date_found        = request.form.get("date_found", "").strip()
         description       = request.form.get("description", "").strip()
         status            = request.form.get("status", "found").strip()
+        submitted_to      = request.form.get("submitted_to", "self").strip()
+        submitted_department = request.form.get("submitted_department", "").strip()
+        holder_contact    = request.form.get("holder_contact", "").strip()
         scanned_roll      = request.form.get("scanned_roll", "").strip()
         scanned_email     = request.form.get("scanned_email", "").strip()
         scanned_name      = request.form.get("scanned_name", "").strip()
@@ -510,7 +904,20 @@ def report():
 
         if not title or not category or not location or not description:
             flash("Please fill in all required fields.", "error")
-            return render_template("report.html", current_user=current_user)
+            return render_template("report.html", current_user=current_user, departments=DEPARTMENTS)
+
+        if status == "found":
+            if submitted_to == "department":
+                if submitted_department not in DEPARTMENTS:
+                    flash("Please choose a valid department for submission.", "error")
+                    return render_template("report.html", current_user=current_user, departments=DEPARTMENTS)
+                holder_contact = ""
+            else:
+                submitted_to = "self"
+                submitted_department = ""
+                if not holder_contact:
+                    flash("Contact number is required when you keep the item yourself.", "error")
+                    return render_template("report.html", current_user=current_user, departments=DEPARTMENTS)
 
         # Handle image
         image_filename = uploaded_filename or None
@@ -532,12 +939,29 @@ def report():
             "reported_by_id":    current_user["id"],
             "reported_by_name":  current_user["name"],
             "reported_by_email": current_user["email"],
-            "date_submitted":    datetime.now().strftime("%Y-%m-%d %H:%M")
+            "date_submitted":    datetime.now().strftime("%Y-%m-%d %H:%M"),
+            "submitted_to":      submitted_to,
+            "submitted_department": submitted_department,
+            "holder_contact":    holder_contact,
+            "department_verification_status": "pending" if (status == "found" and submitted_to == "department") else "not_required",
+            "department_verified_by": "",
+            "department_verified_at": "",
+            "claim_status": "none",
+            "claim_requested_by": "",
+            "claim_requested_at": "",
+            "claim_description": "",
+            "claim_reviewed_by": "",
+            "claim_reviewed_at": "",
+            "claim_review_notes": ""
         }
 
         data = load_data()
         data["items"].append(new_item)
         save_data(data)
+
+        # ---- AWARD POINTS ----
+        # Give the reporter points for submitting this report
+        award_points(current_user["id"], status)
 
         # ---- EMAIL FLOW ----
         is_id_card = (category == "ID Card") or ("id card" in title.lower())
@@ -569,7 +993,7 @@ def report():
 
         return redirect(url_for("submissions"))
 
-    return render_template("report.html", current_user=current_user)
+    return render_template("report.html", current_user=current_user, departments=DEPARTMENTS)
 
 
 # ============================================================
@@ -581,13 +1005,35 @@ def scan_id_card():
     if "image" not in request.files:
         return jsonify({"success": False, "message": "No image received"})
 
-    file     = request.files["image"]
-    filename = save_uploaded_image(file)
-
-    if not filename:
+    file = request.files["image"]
+    if not file or not file.filename or not allowed_file(file.filename):
         return jsonify({"success": False, "message": "Invalid image file"})
 
-    image_path    = os.path.join(UPLOAD_FOLDER, filename)
+    ext = file.filename.rsplit(".", 1)[1].lower()
+    temp_name = "scan_" + str(uuid.uuid4())[:12] + "." + ext
+    image_path = os.path.join(UPLOAD_FOLDER, temp_name)
+    file.save(image_path)
+
+    # Store uploaded image in persistent storage for later submission flow.
+    persisted_filename = temp_name
+    client = get_supabase_client()
+    if client:
+        try:
+            with open(image_path, "rb") as f:
+                file_bytes = f.read()
+            path = f"uploads/{str(uuid.uuid4())[:12]}.{ext}"
+            content_type = "image/jpeg" if ext == "jpg" else f"image/{ext}"
+            client.storage.from_(SUPABASE_STORAGE_BUCKET).upload(
+                path,
+                file_bytes,
+                {"content-type": content_type}
+            )
+            public_url = client.storage.from_(SUPABASE_STORAGE_BUCKET).get_public_url(path)
+            if public_url:
+                persisted_filename = public_url
+        except Exception as e:
+            print(f"Supabase scan-image upload failed; using local file. Error: {e}")
+
     roll, student = ocr_scan_id_card(image_path)
 
     if student:
@@ -596,7 +1042,7 @@ def scan_id_card():
             "roll":     roll,
             "name":     student["name"],
             "email":    student["email"],
-            "filename": filename
+            "filename": persisted_filename
         })
     elif roll:
         guessed_email = roll_number_to_email(roll)
@@ -605,14 +1051,26 @@ def scan_id_card():
             "roll":     roll,
             "name":     "Student",
             "email":    guessed_email or "unknown",
-            "filename": filename
+            "filename": persisted_filename
         })
     else:
         return jsonify({
             "success":  False,
             "message":  "No roll number detected in image",
-            "filename": filename
+            "filename": persisted_filename
         })
+
+
+@app.context_processor
+def inject_template_helpers():
+    def image_src(image_value):
+        if not image_value:
+            return ""
+        value = str(image_value)
+        if value.startswith("http://") or value.startswith("https://"):
+            return value
+        return url_for("static", filename="uploads/" + value)
+    return {"image_src": image_src}
 
 
 # ============================================================
@@ -671,6 +1129,63 @@ def send_notification():
 
 
 # ============================================================
+# LEADERBOARD ROUTE
+# ============================================================
+
+@app.route("/leaderboard")
+def leaderboard():
+    """
+    Shows all users ranked by their reward points.
+    Highest points = top of the list.
+    """
+    run_archiving()
+    current_user = get_logged_in_user()
+    data         = load_data()
+
+    # Build leaderboard: only non-admin users, sorted by points descending
+    board = []
+    for user in data["users"]:
+        if user.get("is_admin"):
+            continue   # admin does not appear on leaderboard
+        board.append({
+            "id":     user["id"],
+            "name":   user["name"],
+            "email":  user["email"],
+            "points": user.get("points", 0)
+        })
+
+    # Sort highest points first
+    board.sort(key=lambda u: u["points"], reverse=True)
+
+    return render_template("Leaderboard.html",
+        current_user=current_user,
+        board=board
+    )
+
+
+# ============================================================
+# ARCHIVE ROUTE — view all archived items
+# ============================================================
+
+@app.route("/archive")
+def archive():
+    """
+    Shows items that have been automatically archived after 60 days.
+    """
+    run_archiving()
+    current_user = get_logged_in_user()
+    data         = load_data()
+
+    archived_items = [i for i in data["items"] if i["status"] == "archived"]
+    archived_items = list(reversed(archived_items))
+
+    return render_template("Archive.html",
+        current_user=current_user,
+        items=archived_items
+    )
+
+
+# ============================================================
 # ADMIN ROUTES
 # ============================================================
 
@@ -680,12 +1195,16 @@ def admin_panel():
     """Admin dashboard — overview of everything"""
     current_user = get_logged_in_user()
     data         = load_data()
+    ensure_data_defaults(data)
     settings     = load_email_settings()
 
-    total_users = len(data["users"])
-    total_items = len(data["items"])
-    found_items = sum(1 for i in data["items"] if i["status"] == "found")
-    lost_items  = sum(1 for i in data["items"] if i["status"] == "lost")
+    total_users    = len(data["users"])
+    total_items    = len(data["items"])
+    found_items    = sum(1 for i in data["items"] if i["status"] == "found")
+    lost_items     = sum(1 for i in data["items"] if i["status"] == "lost")
+    archived_items = sum(1 for i in data["items"] if i["status"] == "archived")
+    pending_department_items = sum(1 for i in data["items"] if i.get("department_verification_status") == "pending")
+    pending_claim_items = sum(1 for i in data["items"] if i.get("claim_status") == "pending")
 
     return render_template("admin.html",
         current_user=current_user,
@@ -695,8 +1214,75 @@ def admin_panel():
         total_items=total_items,
         found_items=found_items,
         lost_items=lost_items,
+        archived_items=archived_items,
+        pending_department_items=pending_department_items,
+        pending_claim_items=pending_claim_items,
+        departments=DEPARTMENTS,
         email_settings=settings
     )
+
+
+@app.route("/admin/verify-department/<item_id>", methods=["POST"])
+@require_admin
+def admin_verify_department(item_id):
+    current_user = get_logged_in_user()
+    data = load_data()
+    ensure_data_defaults(data)
+
+    for item in data["items"]:
+        if item["id"] == item_id:
+            if item.get("submitted_to") != "department":
+                flash("This item is not submitted to a department.", "error")
+                return redirect(url_for("admin_panel"))
+            item["department_verification_status"] = "verified"
+            item["department_verified_by"] = current_user["name"]
+            item["department_verified_at"] = datetime.now().strftime("%Y-%m-%d %H:%M")
+            save_data(data)
+            flash(f"Department verification recorded for {item['title']}.", "success")
+            return redirect(url_for("admin_panel"))
+
+    flash("Item not found.", "error")
+    return redirect(url_for("admin_panel"))
+
+
+@app.route("/admin/review-claim/<item_id>", methods=["POST"])
+@require_admin
+def admin_review_claim(item_id):
+    current_user = get_logged_in_user()
+    decision = request.form.get("decision", "").strip()
+    notes = request.form.get("notes", "").strip()
+
+    if decision not in ("approved", "rejected"):
+        flash("Invalid claim decision.", "error")
+        return redirect(url_for("admin_panel"))
+
+    data = load_data()
+    ensure_data_defaults(data)
+
+    for item in data["items"]:
+        if item["id"] == item_id:
+            if item.get("claim_status") != "pending":
+                flash("No pending claim exists for this item.", "error")
+                return redirect(url_for("admin_panel"))
+
+            if item.get("submitted_to") == "self":
+                flash("Self-held items are handled directly between users and cannot be admin-verified.", "info")
+                return redirect(url_for("admin_panel"))
+
+            item["claim_status"] = decision
+            item["claim_reviewed_by"] = current_user["name"]
+            item["claim_reviewed_at"] = datetime.now().strftime("%Y-%m-%d %H:%M")
+            item["claim_review_notes"] = notes
+
+            if decision == "approved":
+                item["status"] = "recovered"
+
+            save_data(data)
+            flash(f"Claim {decision} for {item['title']}.", "success")
+            return redirect(url_for("admin_panel"))
+
+    flash("Item not found.", "error")
+    return redirect(url_for("admin_panel"))
 
 
 @app.route("/admin/delete-item/<item_id>", methods=["POST"])
@@ -720,6 +1306,7 @@ def admin_edit_item(item_id):
     """Admin: edit any item's details"""
     current_user = get_logged_in_user()
     data         = load_data()
+    ensure_data_defaults(data)
 
     # Find the item
     target = None
@@ -739,13 +1326,35 @@ def admin_edit_item(item_id):
         target["description"] = request.form.get("description", target["description"]).strip()
         target["status"]      = request.form.get("status", target["status"]).strip()
         target["date_found"]  = request.form.get("date_found", target.get("date_found", "")).strip()
+        target["submitted_to"] = request.form.get("submitted_to", target.get("submitted_to", "self")).strip()
+        target["submitted_department"] = request.form.get("submitted_department", target.get("submitted_department", "")).strip()
+        target["holder_contact"] = request.form.get("holder_contact", target.get("holder_contact", "")).strip()
+
+        if target["submitted_to"] == "department":
+            if target["submitted_department"] not in DEPARTMENTS:
+                flash("Please select a valid department.", "error")
+                return render_template("admin_edit_item.html", current_user=current_user, item=target, departments=DEPARTMENTS)
+            target["holder_contact"] = ""
+            if target.get("department_verification_status") == "not_required":
+                target["department_verification_status"] = "pending"
+        else:
+            target["submitted_to"] = "self"
+            target["submitted_department"] = ""
+            if not target["holder_contact"]:
+                flash("Contact number is required for self-held items.", "error")
+                return render_template("admin_edit_item.html", current_user=current_user, item=target, departments=DEPARTMENTS)
+            target["department_verification_status"] = "not_required"
+            target["department_verified_by"] = ""
+            target["department_verified_at"] = ""
+
         save_data(data)
         flash("Item updated.", "success")
         return redirect(url_for("admin_panel"))
 
     return render_template("admin_edit_item.html",
         current_user=current_user,
-        item=target
+        item=target,
+        departments=DEPARTMENTS
     )
 
 
@@ -848,10 +1457,27 @@ def admin_add_item():
         description = request.form.get("description", "").strip()
         status      = request.form.get("status", "found").strip()
         date_found  = request.form.get("date_found", "").strip()
+        submitted_to = request.form.get("submitted_to", "department").strip()
+        submitted_department = request.form.get("submitted_department", "").strip()
+        holder_contact = request.form.get("holder_contact", "").strip()
 
         if not title or not category or not location or not description:
             flash("Please fill in all required fields.", "error")
-            return render_template("admin_add_item.html", current_user=current_user)
+            return render_template("admin_add_item.html", current_user=current_user, departments=DEPARTMENTS)
+
+        if status == "found" and submitted_to == "department" and submitted_department not in DEPARTMENTS:
+            flash("Please choose a valid department.", "error")
+            return render_template("admin_add_item.html", current_user=current_user, departments=DEPARTMENTS)
+
+        if status == "found" and submitted_to != "department" and not holder_contact:
+            flash("Contact number is required when holder keeps the item.", "error")
+            return render_template("admin_add_item.html", current_user=current_user, departments=DEPARTMENTS)
+
+        if submitted_to == "department":
+            holder_contact = ""
+        else:
+            submitted_to = "self"
+            submitted_department = ""
 
         new_item = {
             "id":                "item_" + str(uuid.uuid4())[:8],
@@ -865,7 +1491,20 @@ def admin_add_item():
             "reported_by_id":    current_user["id"],
             "reported_by_name":  "Admin",
             "reported_by_email": current_user["email"],
-            "date_submitted":    datetime.now().strftime("%Y-%m-%d %H:%M")
+            "date_submitted":    datetime.now().strftime("%Y-%m-%d %H:%M"),
+            "submitted_to":      submitted_to,
+            "submitted_department": submitted_department,
+            "holder_contact":    holder_contact,
+            "department_verification_status": "pending" if (status == "found" and submitted_to == "department") else "not_required",
+            "department_verified_by": "",
+            "department_verified_at": "",
+            "claim_status": "none",
+            "claim_requested_by": "",
+            "claim_requested_at": "",
+            "claim_description": "",
+            "claim_reviewed_by": "",
+            "claim_reviewed_at": "",
+            "claim_review_notes": ""
         }
 
         data = load_data()
@@ -874,7 +1513,7 @@ def admin_add_item():
         flash("Item added successfully.", "success")
         return redirect(url_for("admin_panel"))
 
-    return render_template("admin_add_item.html", current_user=current_user)
+    return render_template("admin_add_item.html", current_user=current_user, departments=DEPARTMENTS)
 
 
 # ============================================================
@@ -895,12 +1534,17 @@ if __name__ == "__main__":
     print("  → Goes to /admin panel automatically")
     print("")
     print("  Student accounts (all password123):")
-    print("  i24-0001@isb.nu.edu.pk")
-    print("  i24-0031@isb.nu.edu.pk  (Musa)")
-    print("  i24-0129@isb.nu.edu.pk  (Ashhad)")
-    print("  i24-2071@isb.nu.edu.pk  (Fahad)")
+    print("  i240001@isb.nu.edu.pk")
+    print("  i240031@isb.nu.edu.pk  (Musa)")
+    print("  i240129@isb.nu.edu.pk  (Ashhad)")
+    print("  i242071@isb.nu.edu.pk  (Fahad)")
     print("")
     print("  Email: configure at /admin/email-settings")
+    print("")
+    print("  New features:")
+    print("  /leaderboard  — Points leaderboard")
+    print("  /archive      — Items archived after 60 days")
+    print("  Points: +50 for found item, +25 for lost item")
     print("=" * 55)
     print("")
 

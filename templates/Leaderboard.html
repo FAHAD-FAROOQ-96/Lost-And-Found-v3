@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% block title %}Leaderboard — Lost & Found{% endblock %}
+
+{% block content %}
+<section class="list-page">
+    <div class="list-wrap">
+
+        <div class="list-header">
+            <div>
+                <h1 class="page-title">Leaderboard</h1>
+                <p class="page-sub">
+                    Students ranked by reward points earned for reporting found items.
+                </p>
+            </div>
+            {% if current_user and not current_user.get('is_admin') %}
+                <a href="{{ url_for('report') }}" class="btn-accent">+ Report to Earn Points</a>
+            {% endif %}
+        </div>
+
+        <!-- Points key -->
+        <div class="points-key">
+            <div class="points-key-item">
+                <span class="pk-badge pk-found">+50 pts</span>
+                <span class="pk-label">Reporting a found item</span>
+            </div>
+            <div class="points-key-item">
+                <span class="pk-badge pk-lost">+25 pts</span>
+                <span class="pk-label">Reporting a lost item</span>
+            </div>
+        </div>
+
+        {% if board %}
+
+            <!-- Top 3 podium (only if at least 1 person) -->
+            {% if board|length >= 1 %}
+            <div class="podium-row">
+
+                <!-- 2nd place (left) -->
+                {% if board|length >= 2 %}
+                <div class="podium-card podium-2">
+                    <div class="podium-medal">🥈</div>
+                    <div class="podium-avatar">{{ board[1].name[0].upper() }}</div>
+                    <div class="podium-name">{{ board[1].name }}</div>
+                    <div class="podium-pts">{{ board[1].points }} pts</div>
+                    <div class="podium-bar pb-2"></div>
+                </div>
+                {% endif %}
+
+                <!-- 1st place (centre, tallest) -->
+                <div class="podium-card podium-1">
+                    <div class="podium-crown">👑</div>
+                    <div class="podium-medal">🥇</div>
+                    <div class="podium-avatar av-gold">{{ board[0].name[0].upper() }}</div>
+                    <div class="podium-name">{{ board[0].name }}</div>
+                    <div class="podium-pts">{{ board[0].points }} pts</div>
+                    <div class="podium-bar pb-1"></div>
+                </div>
+
+                <!-- 3rd place (right) -->
+                {% if board|length >= 3 %}
+                <div class="podium-card podium-3">
+                    <div class="podium-medal">🥉</div>
+                    <div class="podium-avatar">{{ board[2].name[0].upper() }}</div>
+                    <div class="podium-name">{{ board[2].name }}</div>
+                    <div class="podium-pts">{{ board[2].points }} pts</div>
+                    <div class="podium-bar pb-3"></div>
+                </div>
+                {% endif %}
+
+            </div>
+            {% endif %}
+
+            <!-- Full rankings table -->
+            <div class="admin-table-wrap">
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>Rank</th>
+                            <th>Student</th>
+                            <th>Email</th>
+                            <th>Points</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for entry in board %}
+                        <tr class="{{ 'lb-you' if current_user and entry.id == current_user.id else '' }}">
+
+                            <td class="rank-cell">
+                                {% if loop.index == 1 %}🥇
+                                {% elif loop.index == 2 %}🥈
+                                {% elif loop.index == 3 %}🥉
+                                {% else %}
+                                    <span class="rank-num">#{{ loop.index }}</span>
+                                {% endif %}
+                            </td>
+
+                            <td class="td-name">
+                                {{ entry.name }}
+                                {% if current_user and entry.id == current_user.id %}
+                                    <span class="you-tag">You</span>
+                                {% endif %}
+                            </td>
+
+                            <td class="td-email">{{ entry.email }}</td>
+
+                            <td class="pts-cell">
+                                <span class="pts-num">{{ entry.points }}</span>
+                                <span class="pts-unit">pts</span>
+                            </td>
+
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+        {% else %}
+            <div class="empty">
+                <div class="empty-icon">🏆</div>
+                <h3>No entries yet</h3>
+                <p>Be the first to earn points by reporting a found item!</p>
+                {% if current_user %}
+                    <a href="{{ url_for('report') }}" class="btn-accent" style="margin-top:10px">Report an Item</a>
+                {% endif %}
+            </div>
+        {% endif %}
+
+    </div>
+</section>
+{% endblock %}

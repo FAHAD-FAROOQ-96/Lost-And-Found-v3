@@ -58,6 +58,30 @@
                         placeholder="Describe the item..." required></textarea>
                 </div>
 
+                <div class="field">
+                    <label for="submitted_to">Item Custody</label>
+                    <select id="submitted_to" name="submitted_to">
+                        <option value="department" selected>Submitted to Department</option>
+                        <option value="self">Held by Reporter</option>
+                    </select>
+                </div>
+
+                <div class="field" id="deptField">
+                    <label for="submitted_department">Department</label>
+                    <select id="submitted_department" name="submitted_department">
+                        <option value="">-- Select Department --</option>
+                        {% for dept in departments %}
+                            <option value="{{ dept }}">{{ dept }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="field" id="contactField" style="display:none;">
+                    <label for="holder_contact">Holder Contact Number</label>
+                    <input type="text" id="holder_contact" name="holder_contact"
+                           placeholder="Required when item is self-held">
+                </div>
+
                 <div class="form-actions">
                     <button type="submit" class="btn-submit">Add Item</button>
                     <a href="{{ url_for('admin_panel') }}" class="btn-cancel">Cancel</a>
@@ -67,4 +91,29 @@
         </div>
     </div>
 </section>
+<script>
+    (function () {
+        var submittedTo = document.getElementById("submitted_to")
+        var deptField = document.getElementById("deptField")
+        var deptInput = document.getElementById("submitted_department")
+        var contactField = document.getElementById("contactField")
+        var contactInput = document.getElementById("holder_contact")
+
+        function sync() {
+            if (submittedTo.value === "department") {
+                deptField.style.display = "block"
+                contactField.style.display = "none"
+                deptInput.required = true
+                contactInput.required = false
+            } else {
+                deptField.style.display = "none"
+                contactField.style.display = "block"
+                deptInput.required = false
+                contactInput.required = true
+            }
+        }
+        submittedTo.addEventListener("change", sync)
+        sync()
+    })()
+</script>
 {% endblock %}

@@ -36,6 +36,18 @@
                 <span class="astat-label">Lost Items</span>
             </div>
             <div class="astat">
+                <span class="astat-num" style="color:var(--muted)">{{ archived_items }}</span>
+                <span class="astat-label">Archived</span>
+            </div>
+            <div class="astat">
+                <span class="astat-num" style="color:var(--blue)">{{ pending_department_items }}</span>
+                <span class="astat-label">Pending Dept Verify</span>
+            </div>
+            <div class="astat">
+                <span class="astat-num" style="color:var(--accent)">{{ pending_claim_items }}</span>
+                <span class="astat-label">Pending Claims</span>
+            </div>
+            <div class="astat">
                 <span class="astat-num" style="color:{{ 'var(--green)' if email_settings.enabled else 'var(--muted)' }}">
                     {{ '✓ ON' if email_settings.enabled else '✗ OFF' }}
                 </span>
@@ -106,8 +118,10 @@
                             <th>Item</th>
                             <th>Category</th>
                             <th>Status</th>
+                            <th>Custody</th>
                             <th>Location</th>
                             <th>Reported By</th>
+                            <th>Claim</th>
                             <th>Date</th>
                             <th>Actions</th>
                         </tr>
@@ -117,7 +131,7 @@
                         <tr>
                             <td class="td-name">
                                 {% if item.image %}
-                                    <img src="{{ url_for('static', filename='uploads/' + item.image) }}"
+                                    <img src="{{ image_src(item.image) }}"
                                          class="admin-thumb" alt="">
                                 {% endif %}
                                 {{ item.title }}
@@ -126,10 +140,50 @@
                             <td>
                                 <span class="status-tag status-{{ item.status }}">{{ item.status.upper() }}</span>
                             </td>
+                            <td class="td-muted">
+                                {% if item.submitted_to == 'department' %}
+                                    {{ item.submitted_department }}
+                                    <br>
+                                    {% if item.department_verification_status == 'verified' %}
+                                        <small style="color:var(--green)">Verified by {{ item.department_verified_by }}</small>
+                                    {% else %}
+                                        <small style="color:var(--accent)">Pending department verification</small>
+                                    {% endif %}
+                                {% else %}
+                                    Self-held
+                                    <br>
+                                    <small>{{ item.holder_contact or 'No contact' }}</small>
+                                {% endif %}
+                            </td>
                             <td class="td-muted">{{ item.location }}</td>
                             <td class="td-muted">{{ item.reported_by_name }}</td>
+                            <td class="td-muted">
+                                {{ item.claim_status|upper }}
+                                {% if item.claim_status == 'pending' %}
+                                    <br><small>{{ item.claim_requested_by }}</small>
+                                {% endif %}
+                            </td>
                             <td class="td-muted">{{ item.date_submitted[:10] }}</td>
                             <td class="td-actions">
+                                {% if item.submitted_to == 'department' and item.department_verification_status != 'verified' %}
+                                    <form method="POST" action="{{ url_for('admin_verify_department', item_id=item.id) }}" style="display:inline">
+                                        <button class="btn-table-sm btn-toggle">Verify Dept</button>
+                                    </form>
+                                {% endif %}
+
+                                {% if item.claim_status == 'pending' and item.submitted_to == 'department' %}
+                                    <form method="POST" action="{{ url_for('admin_review_claim', item_id=item.id) }}" style="display:inline">
+                                        <input type="hidden" name="decision" value="approved">
+                                        <input type="hidden" name="notes" value="Approved after manual verification.">
+                                        <button class="btn-table-sm btn-edit">Approve Claim</button>
+                                    </form>
+                                    <form method="POST" action="{{ url_for('admin_review_claim', item_id=item.id) }}" style="display:inline">
+                                        <input type="hidden" name="decision" value="rejected">
+                                        <input type="hidden" name="notes" value="Rejected after manual verification.">
+                                        <button class="btn-table-sm btn-del">Reject Claim</button>
+                                    </form>
+                                {% endif %}
+
                                 <a href="{{ url_for('admin_edit_item', item_id=item.id) }}"
                                    class="btn-table-sm btn-edit">Edit</a>
                                 <form method="POST" action="{{ url_for('admin_delete_item', item_id=item.id) }}"
