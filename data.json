@@ -57,6 +57,14 @@
             "password": "password123",
             "is_admin": false,
             "points": 225
+        },
+        {
+            "id": "u_05c998dd",
+            "name": "Saad",
+            "email": "i240058@isb.nu.edu.pk",
+            "password": "123456",
+            "is_admin": false,
+            "points": 0
         }
     ],
     "items": [

@@ -507,7 +507,7 @@ def run_archiving():
 # ============================================================
 
 STUDENT_DB = [
-    {"roll": "24i-0001", "name": "Ali Hassan",      "email": "i240001@isb.nu.edu.pk"},
+    {"roll": "24i-0001", "name": "Ali Hassan",       "email": "i240001@isb.nu.edu.pk"},
     {"roll": "24i-0002", "name": "Sara Khan",        "email": "i240002@isb.nu.edu.pk"},
     {"roll": "24i-0003", "name": "Ahmed Raza",       "email": "i240003@isb.nu.edu.pk"},
     {"roll": "24i-0004", "name": "Fatima Malik",     "email": "i240004@isb.nu.edu.pk"},
@@ -588,14 +588,14 @@ def setup_sample_data():
                             "is_admin": True,
                             "points":   0
                         },
-                        {"id": "u001", "name": "Ali Hassan",  "email": "i24-0001@isb.nu.edu.pk", "password": "password123", "is_admin": False, "points": 150},
-                        {"id": "u002", "name": "Sara Khan",   "email": "i24-0002@isb.nu.edu.pk", "password": "password123", "is_admin": False, "points": 200},
-                        {"id": "u003", "name": "Ahmed Raza",  "email": "i24-0003@isb.nu.edu.pk", "password": "password123", "is_admin": False, "points": 75},
-                        {"id": "u004", "name": "Fatima Malik","email": "i24-0004@isb.nu.edu.pk", "password": "password123", "is_admin": False, "points": 320},
-                        {"id": "u005", "name": "Usman Tariq", "email": "i24-0005@isb.nu.edu.pk", "password": "password123", "is_admin": False, "points": 90},
-                        {"id": "u006", "name": "Musa Javed",  "email": "i24-0031@isb.nu.edu.pk", "password": "password123", "is_admin": False, "points": 50},
-                        {"id": "u007", "name": "Ashhad Saeed","email": "i24-0129@isb.nu.edu.pk", "password": "password123", "is_admin": False, "points": 25},
-                        {"id": "u008", "name": "Fahad Farooq","email": "i24-2071@isb.nu.edu.pk", "password": "password123", "is_admin": False, "points": 100},
+                        {"id": "u001", "name": "Ali Hassan",  "email": "i240001@isb.nu.edu.pk", "password": "password123", "is_admin": False, "points": 150},
+                        {"id": "u002", "name": "Sara Khan",   "email": "i240002@isb.nu.edu.pk", "password": "password123", "is_admin": False, "points": 200},
+                        {"id": "u003", "name": "Ahmed Raza",  "email": "i240003@isb.nu.edu.pk", "password": "password123", "is_admin": False, "points": 75},
+                        {"id": "u004", "name": "Fatima Malik","email": "i240004@isb.nu.edu.pk", "password": "password123", "is_admin": False, "points": 320},
+                        {"id": "u005", "name": "Usman Tariq", "email": "i240005@isb.nu.edu.pk", "password": "password123", "is_admin": False, "points": 90},
+                        {"id": "u006", "name": "Musa Javed",  "email": "i240031@isb.nu.edu.pk", "password": "password123", "is_admin": False, "points": 50},
+                        {"id": "u007", "name": "Ashhad Saeed","email": "i240129@isb.nu.edu.pk", "password": "password123", "is_admin": False, "points": 25},
+                        {"id": "u008", "name": "Fahad Farooq","email": "i242071@isb.nu.edu.pk", "password": "password123", "is_admin": False, "points": 100},
                     ]
                     for user in sample_users:
                         save_user(user)
@@ -1756,7 +1756,7 @@ if __name__ == "__main__":
 
     print("")
     print("=" * 55)
-    print("  Lost & Found — Iteration 1")
+    print("  Lost & Found ")
     print("  Open: http://localhost:5000")
     print("=" * 55)
     print("")
@@ -1765,17 +1765,8 @@ if __name__ == "__main__":
     print("  → Goes to /admin panel automatically")
     print("")
     print("  Student accounts (all password123):")
-    print("  i240001@isb.nu.edu.pk")
-    print("  i240031@isb.nu.edu.pk  (Musa)")
     print("  i240129@isb.nu.edu.pk  (Ashhad)")
     print("  i242071@isb.nu.edu.pk  (Fahad)")
-    print("")
-    print("  Email: configure at /admin/email-settings")
-    print("")
-    print("  New features:")
-    print("  /leaderboard  — Points leaderboard")
-    print("  /archive      — Items archived after 60 days")
-    print("  Points: +50 for found item, +25 for lost item")
     print("=" * 55)
     print("")
 
