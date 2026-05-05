@@ -629,6 +629,10 @@ button { cursor: pointer; font-family: inherit; }
     margin-bottom: 16px;
 }
 .btn-submit:hover { background: var(--accent2); }
+.btn-submit:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
 
 .switch-link {
     text-align: center;

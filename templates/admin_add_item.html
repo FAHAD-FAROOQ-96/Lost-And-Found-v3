@@ -77,9 +77,9 @@
                 </div>
 
                 <div class="field" id="contactField" style="display:none;">
-                    <label for="holder_contact">Holder Contact Number</label>
+                    <label for="holder_contact">Holder Contact (optional)</label>
                     <input type="text" id="holder_contact" name="holder_contact"
-                           placeholder="Required when item is self-held">
+                           placeholder="Optional (users contact via email)">
                 </div>
 
                 <div class="form-actions">
@@ -109,7 +109,7 @@
                 deptField.style.display = "none"
                 contactField.style.display = "block"
                 deptInput.required = false
-                contactInput.required = true
+                contactInput.required = false
             }
         }
         submittedTo.addEventListener("change", sync)

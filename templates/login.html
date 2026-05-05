@@ -33,7 +33,15 @@
                         <input type="password" id="password" name="password" placeholder="Your password" required>
                     </div>
 
-                    <button type="submit" class="btn-submit">Log In →</button>
+                    <button
+                        type="submit"
+                        class="btn-submit"
+                        id="loginSubmitBtn"
+                        data-lockout-seconds="{{ lockout_remaining|default(0) }}"
+                    >
+                        Log In →
+                    </button>
+                    <small id="loginLockoutHint" style="display:none;"></small>
 
                 </form>
 
@@ -45,4 +53,40 @@
         </div>
     </div>
 </section>
+<script>
+(function () {
+    var loginBtn = document.getElementById("loginSubmitBtn");
+    var lockoutHint = document.getElementById("loginLockoutHint");
+    if (!loginBtn || !lockoutHint) return;
+
+    var remaining = parseInt(loginBtn.dataset.lockoutSeconds || "0", 10);
+    if (!remaining || remaining <= 0) return;
+
+    function formatRemaining(totalSeconds) {
+        var mins = Math.floor(totalSeconds / 60);
+        var secs = totalSeconds % 60;
+        return mins + ":" + String(secs).padStart(2, "0");
+    }
+
+    function applyLockoutState() {
+        loginBtn.disabled = true;
+        loginBtn.textContent = "Try again in " + formatRemaining(remaining);
+        lockoutHint.style.display = "block";
+        lockoutHint.textContent = "Too many failed attempts. Login is locked for " + formatRemaining(remaining) + ".";
+    }
+
+    applyLockoutState();
+    var timer = setInterval(function () {
+        remaining -= 1;
+        if (remaining <= 0) {
+            clearInterval(timer);
+            loginBtn.disabled = false;
+            loginBtn.textContent = "Log In →";
+            lockoutHint.style.display = "none";
+            return;
+        }
+        applyLockoutState();
+    }, 1000);
+})();
+</script>
 {% endblock %}

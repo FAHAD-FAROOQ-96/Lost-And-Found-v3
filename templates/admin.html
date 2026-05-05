@@ -152,7 +152,7 @@
                                 {% else %}
                                     Self-held
                                     <br>
-                                    <small>{{ item.holder_contact or 'No contact' }}</small>
+                                    <small>{{ item.reported_by_email or 'No email' }}</small>
                                 {% endif %}
                             </td>
                             <td class="td-muted">{{ item.location }}</td>

@@ -73,6 +73,10 @@
                         <input type="hidden" name="send_email_choice" id="sendEmailChoice" value="">
                     </div>
 
+                    <p id="fileSizeError" class="upload-hint" style="display:none; margin-top:8px; color:var(--red); font-weight:600;">
+                        File size should not be greater than 2 mb.
+                    </p>
+
                     <!-- Image preview -->
                     <div id="imagePreview" style="display:none;">
                         <img id="previewImg" src="" alt="Preview">
@@ -163,10 +167,10 @@
                     </select>
                 </div>
 
-                <div class="field" id="contactField">
-                    <label for="holder_contact">Contact Number <span class="req">*</span></label>
-                    <input type="text" id="holder_contact" name="holder_contact"
-                        placeholder="Required when you keep the item yourself">
+                <div class="field" id="selfHoldNote">
+                    <p class="muted">
+                        Note: If you keep the item with you, your email will be shared with the owner so they can contact you for retrieval.
+                    </p>
                 </div>
 
                 <!-- Reporter info -->
@@ -192,8 +196,7 @@
         var submittedTo = document.getElementById("submitted_to")
         var deptField = document.getElementById("departmentField")
         var deptInput = document.getElementById("submitted_department")
-        var contactField = document.getElementById("contactField")
-        var contactInput = document.getElementById("holder_contact")
+        var selfHoldNote = document.getElementById("selfHoldNote")
 
         function selectedStatus() {
             for (var i = 0; i < statusInputs.length; i++) {
@@ -209,22 +212,19 @@
             submittedTo.disabled = !isFound
             if (!isFound) {
                 deptField.style.display = "none"
-                contactField.style.display = "none"
                 deptInput.required = false
-                contactInput.required = false
+                selfHoldNote.style.display = "none"
                 return
             }
 
             if (toDept) {
                 deptField.style.display = "block"
-                contactField.style.display = "none"
                 deptInput.required = true
-                contactInput.required = false
+                selfHoldNote.style.display = "none"
             } else {
                 deptField.style.display = "none"
-                contactField.style.display = "block"
                 deptInput.required = false
-                contactInput.required = true
+                selfHoldNote.style.display = "block"
             }
         }
 

@@ -24,6 +24,7 @@ var btnSendNo        = document.getElementById("btnSendNo")
 var emailChoiceMsg   = document.getElementById("emailChoiceMsg")
 var scanNote         = document.getElementById("scanNote")
 var locationInput    = document.getElementById("location")
+var fileSizeError    = document.getElementById("fileSizeError")
 
 // Hidden form inputs
 var uploadedFilename  = document.getElementById("uploadedFilename")
@@ -34,6 +35,19 @@ var sendEmailChoice   = document.getElementById("sendEmailChoice")
 
 var selectedFile = null
 var isIdCard     = false
+var MAX_IMAGE_BYTES = 2 * 1024 * 1024
+var FILE_SIZE_ERROR_TEXT = "File size should not be greater than 2 mb."
+
+function showFileSizeError() {
+    if (!fileSizeError) return
+    fileSizeError.textContent = FILE_SIZE_ERROR_TEXT
+    fileSizeError.style.display = "block"
+}
+
+function hideFileSizeError() {
+    if (!fileSizeError) return
+    fileSizeError.style.display = "none"
+}
 
 
 // ---- Category change: show/hide ID card hint ----
@@ -91,8 +105,15 @@ removeImageBtn.addEventListener("click", function () {
 
 // ---- Handle file selection ----
 function handleFileSelected(file) {
+    hideFileSizeError()
     if (!file.type.startsWith("image/")) {
         alert("Please select an image file.")
+        return
+    }
+
+    if (file.size > MAX_IMAGE_BYTES) {
+        showFileSizeError()
+        clearImage()
         return
     }
 
@@ -113,6 +134,7 @@ function handleFileSelected(file) {
 
 // ---- Upload + scan via AJAX ----
 function uploadAndScan(file) {
+    hideFileSizeError()
     isIdCard = categorySelect.value === "ID Card"
 
     var formData = new FormData()
@@ -198,7 +220,7 @@ function uploadAndScan(file) {
 }
 
 
-// ---- YES — send email immediately via AJAX, then mark choice ----
+// ---- YES — mark choice (email will be sent on form submit) ----
 btnSendYes.addEventListener("click", function () {
     var email    = scannedEmail.value
     var name     = scannedName.value || "Student"
@@ -211,48 +233,17 @@ btnSendYes.addEventListener("click", function () {
         return
     }
 
-    // Disable buttons while sending
-    btnSendYes.disabled = true
-    btnSendNo.disabled  = true
-    btnSendYes.textContent = "Sending..."
+    // Mark choice so the backend sends after full form submission
+    sendEmailChoice.value = "yes"
 
-    fetch("/send-notification", {
-        method:  "POST",
-        headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({
-            email:    email,
-            name:     name,
-            location: location
-        })
-    })
-    .then(function (r) { return r.json() })
-    .then(function (result) {
-        // Mark choice so the form knows
-        sendEmailChoice.value = "yes"
+    // Hide the confirmation buttons
+    btnSendYes.style.display = "none"
+    btnSendNo.style.display  = "none"
 
-        // Hide the confirmation buttons
-        btnSendYes.style.display = "none"
-        btnSendNo.style.display  = "none"
-
-        emailChoiceMsg.style.display = "block"
-
-        if (result.success && result.mode === "sent") {
-            emailChoiceMsg.textContent = "✅ Email sent to " + email
-            emailChoiceMsg.style.color = "var(--green)"
-        } else if (result.success && result.mode === "simulated") {
-            emailChoiceMsg.textContent = "⚠️ Email simulated (Gmail not configured). See Admin → Email Settings."
-            emailChoiceMsg.style.color = "var(--accent)"
-        } else {
-            emailChoiceMsg.textContent = "❌ " + (result.message || "Failed to send email.")
-            emailChoiceMsg.style.color = "var(--red)"
-        }
-    })
-    .catch(function (err) {
-        sendEmailChoice.value = "yes"
-        emailChoiceMsg.textContent = "❌ Network error sending email."
-        emailChoiceMsg.style.color = "var(--red)"
-        emailChoiceMsg.style.display = "block"
-    })
+    emailChoiceMsg.style.display = "block"
+    emailChoiceMsg.textContent =
+        "✅ Email will be sent after you complete and submit the report form."
+    emailChoiceMsg.style.color = "var(--green)"
 })
 
 
@@ -285,6 +276,7 @@ function clearImage() {
     scannedEmail.value = ""
     scannedName.value  = ""
     sendEmailChoice.value = ""
+    hideFileSizeError()
     btnSendYes.style.display = "inline-flex"
     btnSendNo.style.display  = "inline-flex"
     btnSendYes.disabled = false

@@ -20,6 +20,7 @@
                 <p><strong>Location:</strong> {{ item.location }}</p>
                 <p><strong>Date Submitted:</strong> {{ item.date_submitted }}</p>
                 <p><strong>Reported By:</strong> {{ item.reported_by_name }}</p>
+                <p><strong>Reporter Email:</strong> {{ item.reported_by_email or 'Not available' }}</p>
                 {% if item.submitted_to == 'department' %}
                     <p><strong>Submitted To:</strong> {{ item.submitted_department }}</p>
                     <p>
@@ -32,7 +33,7 @@
                     </p>
                 {% else %}
                     <p><strong>Holder:</strong> Reporter (self-held item)</p>
-                    <p><strong>Contact Number:</strong> {{ item.holder_contact or 'Not provided' }}</p>
+                    <p><strong>Contact:</strong> Email the reporter above</p>
                 {% endif %}
             </div>
 

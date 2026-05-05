@@ -30,58 +30,68 @@
         </div>
 
         {% if items %}
-            <p class="results-count">{{ items|length }} archived item(s)</p>
+        <p class="results-count">{{ items|length }} archived item(s)</p>
 
-            <div class="items-grid">
-                {% for item in items %}
-                    <div class="item-card archived-card">
+        <div class="items-grid">
+            {% for item in items %}
+            <div class="item-card archived-card">
 
-                        <div class="item-top">
-                            <span class="cat-tag">{{ item.category }}</span>
-                            <span class="status-tag status-archived">ARCHIVED</span>
-                        </div>
+                <div class="item-top">
+                    <span class="cat-tag">{{ item.category }}</span>
+                    <span class="status-tag status-archived">ARCHIVED</span>
+                </div>
 
-                        {% if item.image %}
-                            <img class="item-thumb"
-                                 src="{{ image_src(item.image) }}"
-                                 alt="{{ item.title }}">
-                        {% else %}
-                            <div class="item-icon">
-                                {% if item.category == "Electronics" %}📱
-                                {% elif item.category == "ID Card" %}🪪
-                                {% elif item.category == "Wallet" %}👛
-                                {% elif item.category == "Keys" %}🔑
-                                {% elif item.category == "Bag" %}🎒
-                                {% elif item.category == "Books" %}📚
-                                {% else %}📦{% endif %}
-                            </div>
-                        {% endif %}
+                {% if item.image %}
+                <img class="item-thumb" src="{{ image_src(item.image) }}" alt="{{ item.title }}">
+                {% else %}
+                <div class="item-icon">
+                    {% if item.category == "Electronics" %}📱
+                    {% elif item.category == "ID Card" %}🪪
+                    {% elif item.category == "Wallet" %}👛
+                    {% elif item.category == "Keys" %}🔑
+                    {% elif item.category == "Bag" %}🎒
+                    {% elif item.category == "Books" %}📚
+                    {% else %}📦{% endif %}
+                </div>
+                {% endif %}
 
-                        <h3 class="item-title">{{ item.title }}</h3>
+                <h3 class="item-title">{{ item.title }}</h3>
 
-                        <p class="item-desc">
-                            {{ item.description[:90] }}{% if item.description|length > 90 %}...{% endif %}
-                        </p>
+                <p class="item-desc">
+                    {{ item.description[:90] }}{% if item.description|length > 90 %}...{% endif %}
+                </p>
 
-                        <div class="item-meta">
-                            <span>📍 {{ item.location }}</span>
-                            <span>Submitted: {{ item.date_submitted[:10] }}</span>
-                        </div>
+                <div class="item-meta">
+                    <span>📍 {{ item.location }}</span>
+                    <span>Submitted: {{ item.date_submitted[:10] }}</span>
+                </div>
 
-                        <div class="item-reporter">
-                            Reported by <strong>{{ item.reported_by_name }}</strong>
-                        </div>
+                <div class="item-reporter">
+                    Reported by <strong>{{ item.reported_by_name }}</strong>
+                </div>
 
-                    </div>
-                {% endfor %}
+                <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;">
+                    <a href="{{ url_for('submission_detail', item_id=item.id) }}" class="btn-outline-sm">View Details</a>
+                    {% if current_user and current_user.is_admin %}
+                        <a href="{{ url_for('admin_edit_item', item_id=item.id) }}" class="btn-outline-sm">Edit</a>
+                        <form method="POST" action="{{ url_for('admin_delete_item', item_id=item.id) }}" style="display:inline">
+                            <button type="submit" class="btn-outline-sm" onclick="return confirm('Delete this item permanently?')">
+                                Delete
+                            </button>
+                        </form>
+                    {% endif %}
+                </div>
+
             </div>
+            {% endfor %}
+        </div>
 
         {% else %}
-            <div class="empty">
-                <div class="empty-icon">📭</div>
-                <h3>No archived items</h3>
-                <p>Items older than 60 days will appear here automatically.</p>
-            </div>
+        <div class="empty">
+            <div class="empty-icon">📭</div>
+            <h3>No archived items</h3>
+            <p>Items older than 60 days will appear here automatically.</p>
+        </div>
         {% endif %}
 
     </div>

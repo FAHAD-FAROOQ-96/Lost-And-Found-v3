@@ -16,29 +16,14 @@ try:
     from supabase import create_client
 except Exception:
     create_client = None
-try:
-    from PIL import Image, ImageFilter
-    import pytesseract
-    import numpy as np
-    OCR_AVAILABLE = True
-except Exception:
-    Image = None
-    ImageFilter = None
-    pytesseract = None
-    np = None
-    OCR_AVAILABLE = False
+from PIL import Image, ImageFilter
+import pytesseract
+import numpy as np
 
 # ============================================================
-# TESSERACT PATH
+# TESSERACT PATH — required on Windows
 # ============================================================
-if OCR_AVAILABLE and pytesseract is not None:
-    tesseract_cmd = os.getenv("TESSERACT_CMD", "").strip()
-    if tesseract_cmd:
-        pytesseract.pytesseract.tesseract_cmd = tesseract_cmd
-    elif os.name == "nt":
-        default_tesseract = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
-        if os.path.exists(default_tesseract):
-            pytesseract.pytesseract.tesseract_cmd = default_tesseract
+pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
 app = Flask(__name__)
 app.secret_key = "lostfound_iter1_secret"
@@ -47,10 +32,15 @@ app.secret_key = "lostfound_iter1_secret"
 # PATHS
 # ============================================================
 
-UPLOAD_FOLDER      = os.path.join("static", "uploads")
-DATA_FILE          = "data.json"
-EMAIL_SETTINGS_FILE = "email_settings.json"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+UPLOAD_FOLDER       = os.path.join(BASE_DIR, "static", "uploads")
+DATA_FILE           = os.path.join(BASE_DIR, "data.json")
+EMAIL_SETTINGS_FILE = os.path.join(BASE_DIR, "email_settings.json")
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp"}
+MAX_IMAGE_BYTES = 2 * 1024 * 1024
+FILE_SIZE_ERROR_TEXT = "File size should not be greater than 2 mb."
+FAILED_LOGIN_LIMIT = 5
+LOGIN_LOCKOUT_SECONDS = 120
 SUPABASE_URL = os.getenv("SUPABASE_URL", "").strip()
 SUPABASE_KEY = os.getenv("SUPABASE_KEY", "").strip()
 SUPABASE_STORAGE_BUCKET = os.getenv("SUPABASE_STORAGE_BUCKET", "lost-found-uploads").strip() or "lost-found-uploads"
@@ -502,38 +492,10 @@ def run_archiving():
 
 
 # ============================================================
-# STUDENT DATABASE (26 students)
-# Roll on card : 22I-1898   →   Email : i221898@isb.nu.edu.pk
+# GENERIC STUDENT LOOKUP
+# Roll on card : 22i-1898   →   Email : i221898@isb.nu.edu.pk
+# Valid Batches: 22, 23, 24, 25
 # ============================================================
-
-STUDENT_DB = [
-    {"roll": "24i-0001", "name": "Ali Hassan",       "email": "i240001@isb.nu.edu.pk"},
-    {"roll": "24i-0002", "name": "Sara Khan",        "email": "i240002@isb.nu.edu.pk"},
-    {"roll": "24i-0003", "name": "Ahmed Raza",       "email": "i240003@isb.nu.edu.pk"},
-    {"roll": "24i-0004", "name": "Fatima Malik",     "email": "i240004@isb.nu.edu.pk"},
-    {"roll": "24i-0005", "name": "Usman Tariq",      "email": "i240005@isb.nu.edu.pk"},
-    {"roll": "24i-0006", "name": "Zainab Siddiqui",  "email": "i240006@isb.nu.edu.pk"},
-    {"roll": "24i-0007", "name": "Hamza Sheikh",     "email": "i240007@isb.nu.edu.pk"},
-    {"roll": "24i-0008", "name": "Ayesha Nawaz",     "email": "i240008@isb.nu.edu.pk"},
-    {"roll": "24i-0009", "name": "Omar Khalid",      "email": "i240009@isb.nu.edu.pk"},
-    {"roll": "24i-0010", "name": "Hira Baig",        "email": "i240010@isb.nu.edu.pk"},
-    {"roll": "24i-0031", "name": "Musa Javed",       "email": "i240031@isb.nu.edu.pk"},
-    {"roll": "24i-0129", "name": "Ashhad Saeed",     "email": "i240129@isb.nu.edu.pk"},
-    {"roll": "24i-2071", "name": "Fahad Farooq",     "email": "i242071@isb.nu.edu.pk"},
-    {"roll": "23i-0101", "name": "Bilal Ahmed",      "email": "i230101@isb.nu.edu.pk"},
-    {"roll": "23i-0202", "name": "Nadia Iqbal",      "email": "i230202@isb.nu.edu.pk"},
-    {"roll": "23i-0303", "name": "Tariq Mehmood",    "email": "i230303@isb.nu.edu.pk"},
-    {"roll": "23i-0404", "name": "Sana Rashid",      "email": "i230404@isb.nu.edu.pk"},
-    {"roll": "23i-0505", "name": "Kamran Butt",      "email": "i230505@isb.nu.edu.pk"},
-    {"roll": "22i-0011", "name": "Rabia Zahid",      "email": "i220011@isb.nu.edu.pk"},
-    {"roll": "22i-0022", "name": "Daniyal Chaudhry", "email": "i220022@isb.nu.edu.pk"},
-    {"roll": "22i-0033", "name": "Maham Farhan",     "email": "i220033@isb.nu.edu.pk"},
-    {"roll": "22i-0044", "name": "Saad Mirza",       "email": "i220044@isb.nu.edu.pk"},
-    {"roll": "21i-0111", "name": "Iqra Nasir",       "email": "i210111@isb.nu.edu.pk"},
-    {"roll": "21i-0222", "name": "Faizan Ali",       "email": "i210222@isb.nu.edu.pk"},
-    {"roll": "21i-0333", "name": "Mehreen Aslam",    "email": "i210333@isb.nu.edu.pk"},
-    {"roll": "22i-1898", "name": "Sufyan Nasr",      "email": "i221898@isb.nu.edu.pk"},
-]
 
 
 def setup_sample_data():
@@ -619,7 +581,15 @@ def setup_sample_data():
 # EMAIL — actual Gmail SMTP sending
 # ============================================================
 
-def send_email_notification(recipient_email, recipient_name, item_location, reporter_name):
+def send_email_notification(
+    recipient_email,
+    recipient_name,
+    item_location,
+    reporter_name,
+    submitted_to="self",
+    submitted_department="",
+    reporter_email=""
+):
     """
     Send a real email via Gmail SMTP.
     Credentials come from email_settings.json (set by admin in the UI).
@@ -628,11 +598,21 @@ def send_email_notification(recipient_email, recipient_name, item_location, repo
     settings = load_email_settings()
 
     subject = "[Lost & Found FAST NUCES] Your ID Card has been found!"
+    where_now = ""
+    submitted_to = (submitted_to or "").strip().lower()
+    if submitted_to == "department" and submitted_department:
+        where_now = f"The card has been submitted to: {submitted_department}.\nYou may collect it from there."
+    else:
+        where_now = "The reporter is currently holding the card."
+        if reporter_email:
+            where_now += f"\nYou may contact the reporter directly at: {reporter_email}"
+
     body = (
         f"Assalam o Alaikum {recipient_name},\n\n"
         f"Great news! Your FAST NUCES ID card has been found on campus.\n\n"
         f"Found at : {item_location}\n"
         f"Found by : {reporter_name}\n\n"
+        f"{where_now}\n\n"
         f"Please visit the Lost & Found desk or contact the reporter to\n"
         f"collect your card. Bring any other ID for verification.\n\n"
         f"---\n"
@@ -672,6 +652,156 @@ def send_email_notification(recipient_email, recipient_name, item_location, repo
         return False, str(e)
 
 
+def _tokenize_for_match(text):
+    """Small helper for LOST↔FOUND matching (simple + fast)."""
+    if not text:
+        return set()
+    text = str(text).lower()
+    text = re.sub(r"[^a-z0-9\s]", " ", text)
+    parts = [p for p in text.split() if len(p) >= 3]
+    # remove very common words that inflate matches
+    stop = {"the", "and", "with", "from", "this", "that", "have", "has", "for", "you", "your", "was", "were", "found", "lost", "item"}
+    return {p for p in parts if p not in stop}
+
+
+def _jaccard(a, b):
+    if not a or not b:
+        return 0.0
+    inter = len(a & b)
+    union = len(a | b)
+    if union == 0:
+        return 0.0
+    return inter / union
+
+
+def send_lost_match_notification(
+    lost_reporter_email,
+    lost_reporter_name,
+    lost_item,
+    found_item,
+    found_by_name="",
+    found_by_email="",
+    detail_url=""
+):
+    """
+    Notify a LOST reporter that a likely matching FOUND item was reported.
+    Uses the same Gmail settings mechanism as the ID-card notification.
+    """
+    settings = load_email_settings()
+
+    subject = "[Lost & Found FAST NUCES] Possible match found for your lost item"
+    body_lines = [
+        f"Assalam o Alaikum {lost_reporter_name or 'Student'},",
+        "",
+        "A new FOUND item was reported that may match your LOST report.",
+        "",
+        f"Your LOST item: {lost_item.get('title','')}",
+        f"Category     : {lost_item.get('category','')}",
+        f"Last seen at : {lost_item.get('location','')}",
+        "",
+        f"FOUND item   : {found_item.get('title','')}",
+        f"Found at     : {found_item.get('location','')}",
+        f"Reported by  : {found_by_name or found_item.get('reported_by_name','')}",
+    ]
+    if found_by_email:
+        body_lines.append(f"Reporter email: {found_by_email}")
+    if detail_url:
+        body_lines.extend(["", f"View details: {detail_url}"])
+    body_lines.extend([
+        "",
+        "If this looks like your item, please contact the reporter via email and coordinate collection.",
+        "",
+        "---",
+        "FAST NUCES Islamabad — Lost & Found System",
+        "(This is an automated notification. Do not reply to this email.)"
+    ])
+    body = "\n".join(body_lines)
+
+    if not settings.get("enabled") or not settings.get("sender") or not settings.get("password"):
+        print("")
+        print("=" * 55)
+        print("  LOST↔FOUND MATCH EMAIL (simulated — configure via Admin)")
+        print(f"  To      : {lost_reporter_email}")
+        print(f"  Lost    : {lost_item.get('title','')}")
+        print(f"  Found   : {found_item.get('title','')}")
+        print("=" * 55)
+        return True, "simulated"
+
+    try:
+        msg = MIMEMultipart()
+        msg["From"] = settings["sender"]
+        msg["To"] = lost_reporter_email
+        msg["Subject"] = subject
+        msg.attach(MIMEText(body, "plain"))
+
+        server = smtplib.SMTP("smtp.gmail.com", 587)
+        server.starttls()
+        server.login(settings["sender"], settings["password"])
+        server.sendmail(settings["sender"], lost_reporter_email, msg.as_string())
+        server.quit()
+        print(f"Match email sent to {lost_reporter_email}")
+        return True, "sent"
+    except Exception as e:
+        print(f"Match email sending failed: {e}")
+        return False, str(e)
+
+
+def notify_lost_reporters_of_found(found_item, max_notifications=3):
+    """
+    When a FOUND item is reported, email LOST reporters for likely matches.
+    """
+    data = load_data()
+    found_tokens = _tokenize_for_match(found_item.get("title", "") + " " + found_item.get("description", ""))
+    found_loc_tokens = _tokenize_for_match(found_item.get("location", ""))
+
+    candidates = []
+    for it in data.get("items", []):
+        if it.get("status") != "lost":
+            continue
+        if it.get("reported_by_id") == found_item.get("reported_by_id"):
+            continue
+        if it.get("category") and found_item.get("category") and it.get("category") != found_item.get("category"):
+            continue
+        if not it.get("reported_by_email"):
+            continue
+
+        lost_tokens = _tokenize_for_match(it.get("title", "") + " " + it.get("description", ""))
+        lost_loc_tokens = _tokenize_for_match(it.get("location", ""))
+
+        text_score = _jaccard(found_tokens, lost_tokens)
+        loc_score = _jaccard(found_loc_tokens, lost_loc_tokens)
+        score = (0.75 * text_score) + (0.25 * loc_score)
+
+        if score >= 0.28:
+            candidates.append((score, it))
+
+    candidates.sort(key=lambda x: x[0], reverse=True)
+
+    sent = 0
+    for score, lost_item in candidates:
+        if sent >= max_notifications:
+            break
+
+        detail_url = ""
+        try:
+            detail_url = request.host_url.rstrip("/") + url_for("submission_detail", item_id=found_item["id"])
+        except Exception:
+            detail_url = ""
+
+        ok, _mode = send_lost_match_notification(
+            lost_reporter_email=lost_item.get("reported_by_email", ""),
+            lost_reporter_name=lost_item.get("reported_by_name", ""),
+            lost_item=lost_item,
+            found_item=found_item,
+            found_by_name=found_item.get("reported_by_name", ""),
+            found_by_email=found_item.get("reported_by_email", ""),
+            detail_url=detail_url
+        )
+        if ok:
+            sent += 1
+
+    return sent
+
 # ============================================================
 # OCR HELPERS
 # ============================================================
@@ -682,35 +812,150 @@ def allowed_file(filename):
     return filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
+def _get_filestorage_size_bytes(file):
+    """
+    Determine uploaded file size without consuming the stream.
+    Returns int bytes, or None if unknown.
+    """
+    try:
+        stream = file.stream
+        pos = stream.tell()
+        stream.seek(0, os.SEEK_END)
+        size = stream.tell()
+        stream.seek(pos, os.SEEK_SET)
+        return int(size)
+    except Exception:
+        return None
+
+
+def _upload_file_to_supabase_storage(local_path, storage_path, content_type="application/octet-stream"):
+    """
+    Upload a local file to Supabase Storage and return a public URL (string) if possible.
+    Returns None if Supabase not configured or upload fails.
+    """
+    client = get_supabase_client()
+    if not client:
+        return None
+
+    try:
+        with open(local_path, "rb") as f:
+            data = f.read()
+
+        bucket = client.storage.from_(SUPABASE_STORAGE_BUCKET)
+
+        # Try modern supabase-py signature first; fall back gracefully.
+        try:
+            bucket.upload(
+                path=storage_path,
+                file=data,
+                file_options={"content-type": content_type, "upsert": True},
+            )
+        except TypeError:
+            # Older signature: upload(path, file, file_options)
+            bucket.upload(storage_path, data, {"content-type": content_type, "upsert": True})
+
+        public = bucket.get_public_url(storage_path)
+        if isinstance(public, dict):
+            return public.get("publicUrl") or public.get("publicURL") or public.get("public_url")
+        return public
+    except Exception as e:
+        print(f"Supabase storage upload failed (bucket={SUPABASE_STORAGE_BUCKET}): {e}")
+        return None
+
+
 def save_uploaded_image(file):
     if not file or file.filename == "":
         return None
     if not allowed_file(file.filename):
         return None
+
+    size = _get_filestorage_size_bytes(file)
+    if size is not None and size > MAX_IMAGE_BYTES:
+        return "ERROR_FILE_TOO_LARGE"
+
     ext = file.filename.rsplit(".", 1)[1].lower()
     unique_name = str(uuid.uuid4())[:12] + "." + ext
+    local_path = os.path.join(UPLOAD_FOLDER, unique_name)
+    file.save(local_path)
 
-    # Try Supabase Storage first when configured.
-    client = get_supabase_client()
-    if client:
-        try:
-            file_bytes = file.read()
-            file.stream.seek(0)
-            path = f"uploads/{unique_name}"
-            content_type = "image/jpeg" if ext == "jpg" else f"image/{ext}"
-            client.storage.from_(SUPABASE_STORAGE_BUCKET).upload(
-                path,
-                file_bytes,
-                {"content-type": content_type}
-            )
-            public_url = client.storage.from_(SUPABASE_STORAGE_BUCKET).get_public_url(path)
-            if public_url:
-                return public_url
-        except Exception as e:
-            print(f"Supabase image upload failed; storing locally. Error: {e}")
+    # If Supabase is configured, upload to Storage and store the public URL in DB.
+    storage_path = "uploads/" + unique_name
+    content_type = getattr(file, "mimetype", None) or "application/octet-stream"
+    public_url = _upload_file_to_supabase_storage(local_path, storage_path, content_type=content_type)
+    return {"stored": (public_url or unique_name), "local": unique_name}
 
-    file.save(os.path.join(UPLOAD_FOLDER, unique_name))
-    return unique_name
+
+STUDENT_DB = [
+    {"roll": "24I-0001", "name": "Ali Hassan",      "email": "i240001@isb.nu.edu.pk"},
+    {"roll": "24I-0002", "name": "Sara Khan",        "email": "i240002@isb.nu.edu.pk"},
+    {"roll": "24I-0003", "name": "Ahmed Raza",       "email": "i240003@isb.nu.edu.pk"},
+    {"roll": "24I-0004", "name": "Fatima Malik",     "email": "i240004@isb.nu.edu.pk"},
+    {"roll": "24I-0005", "name": "Usman Tariq",      "email": "i240005@isb.nu.edu.pk"},
+    {"roll": "24I-0006", "name": "Zainab Siddiqui",  "email": "i240006@isb.nu.edu.pk"},
+    {"roll": "24I-0007", "name": "Hamza Sheikh",     "email": "i240007@isb.nu.edu.pk"},
+    {"roll": "24I-0008", "name": "Ayesha Nawaz",     "email": "i240008@isb.nu.edu.pk"},
+    {"roll": "24I-0009", "name": "Omar Khalid",      "email": "i240009@isb.nu.edu.pk"},
+    {"roll": "24I-0010", "name": "Hira Baig",        "email": "i240010@isb.nu.edu.pk"},
+    {"roll": "23I-0101", "name": "Bilal Ahmed",      "email": "i230101@isb.nu.edu.pk"},
+    {"roll": "23I-0202", "name": "Nadia Iqbal",      "email": "i230202@isb.nu.edu.pk"},
+    {"roll": "23I-0303", "name": "Tariq Mehmood",    "email": "i230303@isb.nu.edu.pk"},
+    {"roll": "23I-0404", "name": "Sana Rashid",      "email": "i230404@isb.nu.edu.pk"},
+    {"roll": "23I-0505", "name": "Kamran Butt",      "email": "i230505@isb.nu.edu.pk"},
+    {"roll": "22I-0011", "name": "Rabia Zahid",      "email": "i220011@isb.nu.edu.pk"},
+    {"roll": "22I-0022", "name": "Daniyal Chaudhry", "email": "i220022@isb.nu.edu.pk"},
+    {"roll": "22i-0033", "name": "Maham Farhan",     "email": "i220033@isb.nu.edu.pk"},
+    {"roll": "22I-0044", "name": "Saad Mirza",       "email": "i220044@isb.nu.edu.pk"},
+    {"roll": "21I-0111", "name": "Iqra Nasir",       "email": "i210111@isb.nu.edu.pk"},
+    {"roll": "21I-0222", "name": "Faizan Ali",       "email": "i210222@isb.nu.edu.pk"},
+    {"roll": "21I-0333", "name": "Mehreen Aslam",    "email": "i210333@isb.nu.edu.pk"},
+    {"roll": "22i-1898", "name": "Sufyan Nasr",      "email": "i221898@isb.nu.edu.pk"},
+
+
+
+    ## AI - 4C
+    {"roll": "24I-0129", "name": "Ashhad Saeed",      "email": "i240129@isb.nu.edu.pk"},
+    {"roll": "24I-2071", "name": "Fahad Farooq",      "email": "i242071@isb.nu.edu.pk"},
+    {"roll": "24I-0002", "name": "Zamin Naqvi",       "email": "i240002@isb.nu.edu.pk"},
+    {"roll": "24I-0011", "name": "Najam ul Saqib",    "email": "i240011@isb.nu.edu.pk"},
+    {"roll": "24I-0023", "name": "Zohair Ahmed",      "email": "i240023@isb.nu.edu.pk"},
+    {"roll": "24I-0115", "name": "Muzammil Yaseen",   "email": "i240115@isb.nu.edu.pk"},
+    {"roll": "24I-0109", "name": "Tawasal Sherazi",   "email": "i240109@isb.nu.edu.pk"},
+    {"roll": "24I-2527", "name": "Ali Riaz",          "email": "i2402527@isb.nu.edu.pk"},
+    {"roll": "24I-0089", "name": "Hamza Sardar",      "email": "i240089@isb.nu.edu.pk"},
+    {"roll": "24I-6516", "name": "Afaq Ahsan",        "email": "i246516@isb.nu.edu.pk"},
+    {"roll": "24I-2536", "name": "Muhammad Ahmed",    "email": "i242536@isb.nu.edu.pk"},
+    {"roll": "24I-0049", "name": "Ahmad Ranjha",      "email": "i240049@isb.nu.edu.pk"},
+    {"roll": "24I-0002", "name": "Zamin Naqvi",       "email": "i240002@isb.nu.edu.pk"},
+    {"roll": "24i-2585", "name": "Noah Faraz",        "email": "i242585@isb.nu.edu.pk"},
+    {"roll": "24I-0031", "name": "Musa Javed",        "email": "i240031@isb.nu.edu.pk"},
+    {"roll": "24I-0030", "name": "Ummamah Bilal",      "email": "i240030@isb.nu.edu.pk"},
+    {"roll": "24I-0038", "name": "Musa Mahmood",       "email": "i240038@isb.nu.edu.pk"},
+    {"roll": "24I-0039", "name": "Hamna Daud",         "email": "i240039@isb.nu.edu.pk"},
+    {"roll": "24I-0047", "name": "Hassan Ali",         "email": "i240047@isb.nu.edu.pk"},
+    {"roll": "24I-0058", "name": "Muhammad Saad",      "email": "i240058@isb.nu.edu.pk"},
+    {"roll": "24I-0062", "name": "Abdul Moiz",         "email": "i240062@isb.nu.edu.pk"},
+    {"roll": "24I-0064", "name": "Sikandar Javed",     "email": "i240064@isb.nu.edu.pk"},
+    {"roll": "24I-0094", "name": "Diya Hurmat",        "email": "i240094@isb.nu.edu.pk"},
+    {"roll": "24I-0097", "name": "Ayna Khan",          "email": "i240097@isb.nu.edu.pk"},
+    {"roll": "24I-0101", "name": "Hanzala Kareem",     "email": "i240101@isb.nu.edu.pk"},
+    {"roll": "24I-0109", "name": "Tawasal Mahdi",      "email": "i240109@isb.nu.edu.pk"},
+    {"roll": "24I-0112", "name": "Ritaj Suleman",      "email": "i240112@isb.nu.edu.pk"},
+    {"roll": "24I-0115", "name": "Muzzammil Yasin",    "email": "i240115@isb.nu.edu.pk"},
+    {"roll": "24I-2025", "name": "Malaika",            "email": "i242025@isb.nu.edu.pk"},
+    {"roll": "24I-2081", "name": "Hajira Gul",         "email": "i242081@isb.nu.edu.pk"},
+    {"roll": "24I-2506", "name": "Munhim Ashraf",      "email": "i242506@isb.nu.edu.pk"},
+    {"roll": "24I-2545", "name": "Umair Ahmad",        "email": "i242545@isb.nu.edu.pk"},
+    {"roll": "24I-3139", "name": "Afnan Qammar",       "email": "i243139@isb.nu.edu.pk"},
+    {"roll": "24I-6078", "name": "Muhammad Huzaifa",   "email": "i246078@isb.nu.edu.pk"},
+
+    {"roll": "24I-6552", "name": "Muhammad Shafay",    "email": "i246552@isb.nu.edu.pk"},
+    {"roll": "24I-6078", "name": "Muhammad Huzaifa",   "email": "i246078@isb.nu.edu.pk"},
+    {"roll": "24I-2134", "name": "Musawir Altaf",      "email": "i242134@isb.nu.edu.pk"},
+    {"roll": "24I-6570", "name": "Jawad Ahmed",        "email": "i246570@isb.nu.edu.pk"},
+
+
+
+]
 
 
 def roll_number_to_email(roll):
@@ -755,10 +1000,6 @@ def ocr_scan_id_card(image_path):
     Multi-pass OCR scan for FAST NUCES ID cards.
     Returns (roll_string_or_None, student_dict_or_None)
     """
-    if not OCR_AVAILABLE:
-        print("OCR dependencies are unavailable in this environment.")
-        return None, None
-
     try:
         img = Image.open(image_path)
         w, h = img.size
@@ -821,14 +1062,14 @@ def ocr_scan_id_card(image_path):
             if roll:
                 return roll, lookup_student_by_roll(roll)
 
-        print("No roll number found.")
-        return None, None
-
     except Exception as e:
         print(f"OCR error: {e}")
         import traceback
         traceback.print_exc()
         return None, None
+
+    print("No roll number found.")
+    return None, None
 
 
 # ============================================================
@@ -895,13 +1136,29 @@ def login():
     if get_logged_in_user():
         return redirect(url_for("home"))
 
+    now_ts = datetime.utcnow().timestamp()
+    lockout_until = float(session.get("login_lockout_until", 0) or 0)
+    failed_attempts = int(session.get("failed_login_attempts", 0) or 0)
+
+    if lockout_until and now_ts >= lockout_until:
+        session.pop("login_lockout_until", None)
+        session.pop("failed_login_attempts", None)
+        lockout_until = 0
+        failed_attempts = 0
+
+    lockout_remaining = int(max(0, lockout_until - now_ts)) if lockout_until else 0
+
     if request.method == "POST":
+        if lockout_remaining > 0:
+            flash("Too many failed attempts. Please wait 2 minutes before trying again.", "error")
+            return render_template("login.html", lockout_remaining=lockout_remaining)
+
         email    = request.form.get("email", "").strip().lower()
         password = request.form.get("password", "").strip()
 
         if not email or not password:
             flash("Please fill in all fields.", "error")
-            return render_template("login.html")
+            return render_template("login.html", lockout_remaining=lockout_remaining)
 
         # Optimized lookup: query only for this specific email
         client = get_supabase_client()
@@ -926,15 +1183,26 @@ def login():
                     break
 
         if matched:
+            session.pop("failed_login_attempts", None)
+            session.pop("login_lockout_until", None)
             session["user_id"] = matched["id"]
             flash(f"Welcome back, {matched['name']}!", "success")
             if matched.get("is_admin"):
                 return redirect(url_for("admin_panel"))
             return redirect(url_for("home"))
         else:
-            flash("Incorrect email or password.", "error")
+            failed_attempts += 1
+            session["failed_login_attempts"] = failed_attempts
+            if failed_attempts >= FAILED_LOGIN_LIMIT:
+                lockout_until = datetime.utcnow().timestamp() + LOGIN_LOCKOUT_SECONDS
+                session["login_lockout_until"] = lockout_until
+                session["failed_login_attempts"] = 0
+                lockout_remaining = LOGIN_LOCKOUT_SECONDS
+                flash("Too many failed attempts. Login is disabled for 2 minutes.", "error")
+            else:
+                flash("Incorrect email or password.", "error")
 
-    return render_template("login.html")
+    return render_template("login.html", lockout_remaining=lockout_remaining)
 
 
 @app.route("/signup", methods=["GET", "POST"])
@@ -950,6 +1218,11 @@ def signup():
 
         if not name or not email or not password or not confirm:
             flash("Please fill in all fields.", "error")
+            return render_template("signup.html")
+
+        name_without_spaces = re.sub(r"\s+", "", name)
+        if len(name_without_spaces) < 5 or len(name_without_spaces) > 15:
+            flash("Name must be 5 to 15 characters long (spaces are allowed and not counted).", "error")
             return render_template("signup.html")
 
         # Strict university email validation: exactly 6 digits after 'i' (e.g. i240001@isb.nu.edu.pk)
@@ -1159,16 +1432,21 @@ def report():
             else:
                 submitted_to = "self"
                 submitted_department = ""
-                if not holder_contact:
-                    flash("Contact number is required when you keep the item yourself.", "error")
-                    return render_template("report.html", current_user=current_user, departments=DEPARTMENTS)
+                holder_contact = ""
 
         # Handle image
         image_filename = uploaded_filename or None
         if not image_filename:
             file = request.files.get("image")
             if file and file.filename:
-                image_filename = save_uploaded_image(file)
+                saved = save_uploaded_image(file)
+                if saved == "ERROR_FILE_TOO_LARGE":
+                    flash(FILE_SIZE_ERROR_TEXT, "error")
+                    return render_template("report.html", current_user=current_user, departments=DEPARTMENTS)
+                if isinstance(saved, dict):
+                    image_filename = saved.get("stored")
+                else:
+                    image_filename = None
 
         # Save item
         new_item = {
@@ -1205,6 +1483,15 @@ def report():
         # Give the reporter points for submitting this report
         award_points(current_user["id"], status)
 
+        # ---- LOST↔FOUND MATCH NOTIFICATIONS ----
+        # If a FOUND item is posted, notify LOST reporters of likely matches.
+        # (Uses email settings; falls back to console simulation if not configured.)
+        if status == "found":
+            try:
+                notify_lost_reporters_of_found(new_item, max_notifications=3)
+            except Exception as e:
+                print(f"Match notification error (non-fatal): {e}")
+
         # ---- EMAIL FLOW ----
         is_id_card = (category == "ID Card") or ("id card" in title.lower())
 
@@ -1215,7 +1502,10 @@ def report():
                     recipient_email=scanned_email,
                     recipient_name=scanned_name or "Student",
                     item_location=location,
-                    reporter_name=current_user["name"]
+                    reporter_name=current_user["name"],
+                    submitted_to=submitted_to,
+                    submitted_department=submitted_department,
+                    reporter_email=current_user.get("email", "")
                 )
                 if success and mode == "sent":
                     flash(f"Item reported! Email sent to {scanned_email}.", "success")
@@ -1247,35 +1537,21 @@ def scan_id_card():
     if "image" not in request.files:
         return jsonify({"success": False, "message": "No image received"})
 
-    file = request.files["image"]
-    if not file or not file.filename or not allowed_file(file.filename):
+    file     = request.files["image"]
+    saved = save_uploaded_image(file)
+
+    if not saved:
         return jsonify({"success": False, "message": "Invalid image file"})
 
-    ext = file.filename.rsplit(".", 1)[1].lower()
-    temp_name = "scan_" + str(uuid.uuid4())[:12] + "." + ext
-    image_path = os.path.join(UPLOAD_FOLDER, temp_name)
-    file.save(image_path)
+    if saved == "ERROR_FILE_TOO_LARGE":
+        return jsonify({"success": False, "message": FILE_SIZE_ERROR_TEXT})
 
-    # Store uploaded image in persistent storage for later submission flow.
-    persisted_filename = temp_name
-    client = get_supabase_client()
-    if client:
-        try:
-            with open(image_path, "rb") as f:
-                file_bytes = f.read()
-            path = f"uploads/{str(uuid.uuid4())[:12]}.{ext}"
-            content_type = "image/jpeg" if ext == "jpg" else f"image/{ext}"
-            client.storage.from_(SUPABASE_STORAGE_BUCKET).upload(
-                path,
-                file_bytes,
-                {"content-type": content_type}
-            )
-            public_url = client.storage.from_(SUPABASE_STORAGE_BUCKET).get_public_url(path)
-            if public_url:
-                persisted_filename = public_url
-        except Exception as e:
-            print(f"Supabase scan-image upload failed; using local file. Error: {e}")
+    local_filename = saved.get("local") if isinstance(saved, dict) else None
+    stored_value   = saved.get("stored") if isinstance(saved, dict) else None
+    if not local_filename or not stored_value:
+        return jsonify({"success": False, "message": "Invalid image file"})
 
+    image_path    = os.path.join(UPLOAD_FOLDER, local_filename)
     roll, student = ocr_scan_id_card(image_path)
 
     if student:
@@ -1284,7 +1560,7 @@ def scan_id_card():
             "roll":     roll,
             "name":     student["name"],
             "email":    student["email"],
-            "filename": persisted_filename
+            "filename": stored_value
         })
     elif roll:
         guessed_email = roll_number_to_email(roll)
@@ -1293,13 +1569,13 @@ def scan_id_card():
             "roll":     roll,
             "name":     "Student",
             "email":    guessed_email or "unknown",
-            "filename": persisted_filename
+            "filename": stored_value
         })
     else:
         return jsonify({
             "success":  False,
             "message":  "No roll number detected in image",
-            "filename": persisted_filename
+            "filename": stored_value
         })
 
 
@@ -1578,9 +1854,7 @@ def admin_edit_item(item_id):
         else:
             target["submitted_to"] = "self"
             target["submitted_department"] = ""
-            if not target["holder_contact"]:
-                flash("Contact number is required for self-held items.", "error")
-                return render_template("admin_edit_item.html", current_user=current_user, item=target, departments=DEPARTMENTS)
+            # Contact numbers are not required; users contact via email.
             target["department_verification_status"] = "not_required"
             target["department_verified_by"] = ""
             target["department_verified_at"] = ""
@@ -1702,9 +1976,7 @@ def admin_add_item():
             flash("Please choose a valid department.", "error")
             return render_template("admin_add_item.html", current_user=current_user, departments=DEPARTMENTS)
 
-        if status == "found" and submitted_to != "department" and not holder_contact:
-            flash("Contact number is required when holder keeps the item.", "error")
-            return render_template("admin_add_item.html", current_user=current_user, departments=DEPARTMENTS)
+        # Contact numbers are not required; users contact via email.
 
         if submitted_to == "department":
             holder_contact = ""

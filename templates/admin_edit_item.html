@@ -70,8 +70,8 @@
                 </div>
 
                 <div class="field" id="contactField">
-                    <label for="holder_contact">Holder Contact Number</label>
-                    <input type="text" id="holder_contact" name="holder_contact" value="{{ item.holder_contact }}">
+                    <label for="holder_contact">Holder Contact (optional)</label>
+                    <input type="text" id="holder_contact" name="holder_contact" value="{{ item.holder_contact }}" placeholder="Optional (users contact via email)">
                 </div>
 
                 <div class="form-actions">
@@ -101,7 +101,7 @@
                 deptField.style.display = "none"
                 contactField.style.display = "block"
                 deptInput.required = false
-                contactInput.required = true
+                contactInput.required = false
             }
         }
         submittedTo.addEventListener("change", sync)
